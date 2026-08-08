@@ -143,6 +143,29 @@ Phase 1 には PR ベースのマイグレーション運用がまだ無い（�
 [data-model.md](data-model.md) で未確定）。実際に必要になった時点で、同じ設定画面から有効化
 できる。
 
+### 環境変数の接続先
+
+Neon をプロジェクトに接続する際の Environments は **Development / Preview / Production の
+3つすべて**を有効にしている。
+
+- **Development は必須。** `vercel env pull .env.local` が既定で引くのはこの環境。ここが無いと
+  `DATABASE_URL` がローカルに落ちてこず、Phase 1 の「手元の Claude Code が `lib/` 経由で DB を
+  触る」が成立しない
+- **Production は必須。** デプロイしたダッシュボードが DB を読めなくなる
+- **Preview は現時点では使われない。** main へ直接コミットしているため Preview デプロイが発生
+  しない
+
+ブランチ作成を無効にしているので、**3環境とも同じ物理DBを指す**。Development が本番DBを指すのは
+意図どおりで、「DBインスタンスは1つ。テーブルで分ける」という方針とも一致する。
+
+**将来見直すトリガー:** ブランチを切って PR を出すようになり、かつアプリ側に書き込み経路が
+できたとき（構想にある `(private)` のナレッジ入力画面が該当）。その Preview デプロイの書き込みが
+本番データに入る。そのときは Preview ブランチングを有効にするか、Environments から Preview を
+外すかを選ぶ。
+
+**注意:** `vercel env pull .env.local` を実行すると、本番DBの接続情報が平文でローカルに置かれる。
+`.env*` は `.gitignore` 済みだが、ファイル自体は本番の鍵として扱う。
+
 ## ナレッジの性質
 
 設計時に効く区別。

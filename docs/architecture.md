@@ -72,6 +72,10 @@ Public にできる理由: ナレッジDB・収支データを外部DBに置く�
 Supabase は認証込みだが、一定期間アクセスがないとプロジェクトが一時停止する仕様があり、
 週1運用と相性が悪い。
 
+リージョンは **AWS Asia Pacific (Singapore) / `ap-southeast-1`**。Vercel の Function Region も
+Singapore (`sin1`) に揃える。Neon に東京リージョンは無く、リージョンは後から変更できない。
+経緯は [decisions/0001-neon-region.md](decisions/0001-neon-region.md) を参照。
+
 ## ナレッジの性質
 
 設計時に効く区別。

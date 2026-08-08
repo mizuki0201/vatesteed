@@ -58,7 +58,8 @@ eve は beta のため、バージョンは `package.json` で完全固定して
 ## 環境
 
 - パッケージマネージャは **pnpm**。npm は使わない
-- node / pnpm のバージョンは mise で管理している
+- node / pnpm のバージョンは mise で管理している。**Node は 24 に固定**（`.mise.toml`）。
+  Vercel が 26 に非対応のため、本番と揃えている
 - pnpm の設定（overrides・allowBuilds など）は `package.json` ではなく
   `pnpm-workspace.yaml` に書く。pnpm 11 は `package.json` の `pnpm` フィールドを読まない
 

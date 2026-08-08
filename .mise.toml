@@ -1,0 +1,6 @@
+# Vercel がランタイムとしてサポートする Node は 24.x / 22.x / 20.x のみ（26 は非対応）。
+# 本番と一致させるため、このリポジトリでは Node 24 に固定する。
+# package.json の engines.node も 24.x で揃えている。
+
+[tools]
+node = "24"

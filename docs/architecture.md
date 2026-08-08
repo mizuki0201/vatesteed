@@ -117,16 +117,38 @@ app/(private)/  ← 100
 ## 環境
 
 ```
-node  26.7.0
+node  24.x     （.mise.toml で固定）
 pnpm  11.20.0
 ```
 
-いずれも mise で管理している。Node 26 は 2026年8月時点で Current。LTS 入りは 2026年10月予定。
+**Node は 24 に固定する。** Vercel がランタイムとしてサポートするのは 24.x（デフォルト）/
+22.x / 20.x のみで、**26 は非対応**（2026年8月確認）。本番と一致させるため、ローカルも 24 に
+下げた。`package.json` の `engines.node` も `24.x` で揃えている。
 
-- **Vercel が Node 26 をランタイムとして対応済みか、デプロイ前に確認すること。**
-- `package.json` の `engines.node` は現在 `24.x` で、実環境の 26.7.0 と一致していない。
-  `pnpm install` のたびに `Unsupported engine` 警告が出る。Vercel の対応確認とあわせて
-  どちらに揃えるか決める。**（未確定）**
+- リポジトリの `.mise.toml` で `node = "24"` を指定している。ファイル名が `mise.toml` では
+  なく `.mise.toml` なのは、古い mise（2024.3.6）が `mise.toml` を読まないため
 - パッケージマネージャは pnpm。pnpm 11 は `package.json` の `pnpm` フィールドを読まないため、
   overrides や allowBuilds は `pnpm-workspace.yaml` に書く
 - eve は beta のため、バージョンはレンジ指定にせず完全固定する
+
+### Vercel 側の制約（未解決）
+
+**Vercel の pnpm サポートは 6〜10 で、11 は一覧にない。** 生成される `pnpm-lock.yaml` は
+`lockfileVersion: '9.0'` なので install 自体は pnpm 9 または 10 で通るが、
+`pnpm-workspace.yaml` に書いた `allowBuilds` と `overrides` は pnpm 11 の書き方のため、
+Vercel 側で無視される可能性がある。
+
+回避策として、Vercel の環境変数に `ENABLE_EXPERIMENTAL_COREPACK=1` を設定すると
+`packageManager: "pnpm@11.20.0"` が尊重される。ただし Vercel は Corepack を experimental と
+明記している。**どちらを採るかは未確定。** 実際のビルドログでどの pnpm が使われたかを見てから
+決める。
+
+### デプロイと eve ランタイム
+
+`next.config.ts` が `withEve(nextConfig)` を通しているため、Next.js アプリをデプロイすると
+eve のエンドポイントも同時に出る。「Phase 1 では eve ランタイムを起動しない」という方針とは
+厳密には一致しない。
+
+ただし `agent/channels/eve.ts` の `placeholderAuth()` は `VERCEL_ENV === "production"` のとき
+必ず `UnauthenticatedError` を投げ、preview でも最終的に 401 になる。外部から叩かれて
+トークンを消費される状態にはならない。認証を差し替えるときはこの前提が崩れるので注意する。

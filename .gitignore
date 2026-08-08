@@ -12,3 +12,6 @@ dist
 # Claude Code のローカル生成物（設定の共有分は .claude/settings.json でコミットする）
 .claude/worktrees
 .claude/settings.local.json
+
+# mise のローカル上書き（.mise.toml はコミットする）
+.mise.local.toml

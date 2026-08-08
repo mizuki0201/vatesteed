@@ -2,6 +2,7 @@ overrides:
   ai: ^7.0.38
 
 allowBuilds:
+  esbuild: false
   sharp: true
 
 minimumReleaseAgeExclude:

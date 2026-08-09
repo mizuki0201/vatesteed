@@ -1,7 +1,6 @@
+// 券種・買い方・出走状態は「入っていい値」なので lib/enums/ にある。
+// ここからは再輸出しない
 export {
-  BET_STYLES,
-  ENTRY_STATUSES,
-  TICKET_TYPES,
   countRunners,
   expandBet,
   isHit,
@@ -9,9 +8,6 @@ export {
   recoveryRate,
   usesBracketNumber,
   type BetInput,
-  type BetStyle,
   type EntryResult,
-  type EntryStatus,
   type ExpandedBet,
-  type TicketType,
 } from "./bets.ts";

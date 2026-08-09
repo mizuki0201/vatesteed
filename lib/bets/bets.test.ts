@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { EntryStatus } from "../enums/index.ts";
 import {
   countRunners,
   expandBet,
@@ -8,7 +9,6 @@ import {
   recoveryRate,
   type BetInput,
   type EntryResult,
-  type EntryStatus,
 } from "./bets.ts";
 
 /** 点数だけ見たいときの短縮。 */

@@ -174,7 +174,7 @@ md マスタで正式名称に直してからSQLを投げる（下記「レー�
 | `id` | bigserial | PK |
 | `name` `name_kana` | text | |
 | `opened_on` | date | 開業日 |
-| `affiliation` | text | 美浦 / 栗東 |
+| `affiliation` | text | 美浦 / 栗東 / 地方 / 外国 |
 | `created_at` `updated_at` | timestamptz | |
 
 ### `entries`
@@ -494,6 +494,10 @@ UPDATE 文に `updated_at = now()` を書き忘れると「いつ時点の話か
 **enum型は使わず、`text` + CHECK制約で縛る。** enum は値の削除と並べ替えができないため。
 マスタテーブルにしないのは、変わらない値に JOIN が重いため。**印だけは記号と並び順が
 ぶら下がるので `marks` テーブル**にしている。
+
+TypeScript から使う写しは [lib/enums/](../lib/enums/) にある。**正本はこの表と DB の CHECK で、
+あちらは写し。** 片方だけ直すとズレるので、`lib/enums/enums.test.ts` が
+[db/schema.sql](../db/schema.sql) と突き合わせて落とすようにしてある。
 
 | カラム | 入っていい値 | テーブル |
 | --- | --- | --- |

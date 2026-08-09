@@ -8,24 +8,7 @@
  * 保留のまま。分けることになっても済むよう、DB に触らない純粋な計算だけにしてある。
  */
 
-export const TICKET_TYPES = [
-  "単勝",
-  "複勝",
-  "枠連",
-  "馬連",
-  "馬単",
-  "ワイド",
-  "3連複",
-  "3連単",
-  "WIN5",
-] as const;
-export type TicketType = (typeof TICKET_TYPES)[number];
-
-export const BET_STYLES = ["単点", "ボックス", "流し", "フォーメーション"] as const;
-export type BetStyle = (typeof BET_STYLES)[number];
-
-export const ENTRY_STATUSES = ["出走", "取消", "除外", "中止", "失格"] as const;
-export type EntryStatus = (typeof ENTRY_STATUSES)[number];
+import type { BetStyle, EntryStatus, TicketType } from "../enums/index.ts";
 
 /** 券種が必要とする列の数。WIN5 は対象5レースぶん。 */
 const LEG_COUNT: Record<TicketType, number> = {

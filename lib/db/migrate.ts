@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Client } from "pg";
+import { writeSchemaSnapshot } from "./schema-snapshot.ts";
 
 /**
  * `db/migrations/` の未適用の .sql を番号順に流す。
@@ -10,12 +11,14 @@ import { Client } from "pg";
  * - 適用済みのファイル名は `schema_migrations` に記録し、二度流さない
  * - 接続は `DATABASE_URL_UNPOOLED`。実行時に使う HTTP 経由のドライバは
  *   複数の文をまたぐトランザクションを張れないため、ここだけ直結する
+ * - 流し終わったら、そのDBの今の姿を `db/schema.sql` に書き出す
  *
  * 実行は人間が手で `pnpm db:migrate`。Vercel のビルドからは流さない
  * （デプロイのたびに本番DBへ走ってしまうため）。
  */
 
 const MIGRATIONS_DIR = fileURLToPath(new URL("../../db/migrations", import.meta.url));
+const SCHEMA_SNAPSHOT = fileURLToPath(new URL("../../db/schema.sql", import.meta.url));
 
 async function main() {
   const url = process.env.DATABASE_URL_UNPOOLED;
@@ -57,7 +60,7 @@ async function main() {
 
     if (pending.length === 0) {
       console.log("未適用のマイグレーションはありません。");
-      await reportTables(client);
+      await finish(client);
       return;
     }
 
@@ -81,10 +84,23 @@ async function main() {
       console.log(`適用: ${filename}`);
     }
 
-    await reportTables(client);
+    await finish(client);
   } finally {
     await client.end();
   }
+}
+
+/**
+ * 流し終わったあとの後始末。今のテーブルを目で確かめ、`db/schema.sql` を更新する。
+ *
+ * スナップショットは未適用が無かったときにも書く。取り直したいときに空振りの
+ * `pnpm db:migrate` で作り直せる。
+ */
+async function finish(client: Client) {
+  await reportTables(client);
+
+  const { filePath, tableCount } = await writeSchemaSnapshot(client, SCHEMA_SNAPSHOT);
+  console.log(`\n${path.relative(process.cwd(), filePath)} を更新しました（${tableCount} テーブル）。`);
 }
 
 /** 今そのDBに何テーブルあるかを出す。流した結果を目で確かめるため。 */

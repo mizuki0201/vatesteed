@@ -15,3 +15,6 @@ dist
 
 # mise のローカル上書き（.mise.toml はコミットする）
 .mise.local.toml
+
+# タスク（手元だけの作業リスト。task-management スキルが読み書きする）
+docs/tasks/

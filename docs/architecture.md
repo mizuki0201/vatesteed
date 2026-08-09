@@ -12,28 +12,52 @@
   - `lib/` をエージェントと Next.js の両方から使う
   - eve は `/eve/v1/*` の HTTP API として動く。画面は自分で書く
 
-## ディレクトリ（想定）
+## ディレクトリ
 
 ```
 vatesteed/
+  .claude/
+    skills -> ../agent/skills   # Claude Code へのブリッジ（シンボリックリンク）
   agent/
     agent.ts
     instructions.md
     tools/          # lib/ を呼ぶ薄いラッパー
     skills/
-    schedules/
   app/
     (public)/
     (member)/
     (friend)/
     (private)/
+  evals/            # eve の eval。Phase 3 で使う
   lib/              # 実体のロジック・DBアクセス
   docs/
+    tasks/          # タスク（1タスク1ファイル）。gitignore 済み
   CLAUDE.md
 ```
 
-現時点で存在するのは `agent/agent.ts` `agent/instructions.md` `agent/channels/eve.ts` と、
-Next.js の初期構成のみ。`tools/` `skills/` `schedules/` および `app/` のルートグループは未作成。
+`agent/tools/` と `app/` の `(member)` `(friend)` `(private)` は、**枠だけ作って中身は空**
+（`.gitkeep` のみ）。tools を使うのは Phase 3。
+
+**`agent/schedules/` は作っていない。** eve の discovery は `schedules/` 配下のファイルを
+すべてスケジュール定義として読もうとするため、`.gitkeep` を置くと `eve dev` が
+`Expected ".../schedules/.gitkeep" to be a TypeScript or markdown schedule file` で落ちる。
+空ディレクトリは git に乗らないので、**最初のスケジュールを書く Phase 2 で作る**。
+`agent/tools/` は同じ置き方でも discovery が通ることを確認済み。
+
+`app/(public)/page.tsx` に Vatesteed の紹介ページを置き、`/` で常時表示している。eve の
+テンプレートに付いていたエージェントチャットは削除した。
+
+`evals/` は枠と [検証したいことの頭出し](../evals/README.md) だけ。動かすのは Phase 3。
+
+### Claude Code へのスキルのブリッジ
+
+スキルの実体は eve の規約どおり `agent/skills/` に置く。ただし Phase 1 で動かすのは
+Claude Code で、Claude Code が読むのは `.claude/skills/` のため、`.claude/skills` を
+`../agent/skills` へのシンボリックリンクにしている。`CLAUDE.md` → `AGENTS.md` と同じ、
+「実体は eve 規約の場所、入口だけ Claude Code 側に置く」形。
+
+Claude Code のスキャナがシンボリックリンクを辿ることは確認済み
+（`claude --plugin-dir ./.claude plugin details .claude` でスキルが列挙される）。
 
 ## 開発フェーズ
 

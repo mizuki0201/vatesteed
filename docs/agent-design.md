@@ -61,6 +61,22 @@
 - **当面は Claude Code 経由**。スマホから投げる形は想定しない
 - 改善したくなった時点で改めて方針を考える
 
+## 作った skill（2026-08-09）
+
+| skill | 役割 |
+| --- | --- |
+| [task-management](../agent/skills/task-management/) | `docs/tasks/` にタスクを起票し、状態と内容を更新し、完了にする |
+
+`task-management` は**予想の中身とは関係ない**。Claude Code から skill が動くことを確かめる
+ための1本目として作り、そのまま作業管理に使っている。ここから「skills の粒度」が決まった
+わけではない（下記「未確定事項」のまま）。
+
+タスクは**1タスク1ファイルでフラットに並べ、`area` と `status` は frontmatter で持つ**。
+`docs/tasks/` は gitignore してあり、コミットしない。
+
+Claude Code へのブリッジの張り方は
+[architecture.md](architecture.md#claude-code-へのスキルのブリッジ) を参照。
+
 ## 未確定事項
 
 **勝手に確定させないこと。**

@@ -10,6 +10,9 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "Bundler",
+    // node:test を素の Node で動かすため、テストは "./bets.ts" のように拡張子付きで import する。
+    // Node の型剥がしは拡張子を省略できないため。noEmit なので出力には影響しない
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",

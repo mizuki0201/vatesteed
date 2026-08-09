@@ -45,6 +45,38 @@ eve に載せる際にラッパーを書くだけで移行できる。
 長い手順や状況依存の手順は `agent/instructions.md` ではなく `agent/skills/` に置く。
 instructions は毎ターン読まれるため、恒久的な identity と standing rule だけに保つ。
 
+## `lib/` の並べ方
+
+**1つの関心ごとに1ディレクトリ。** ファイルを直接 `lib/` 直下に置かない。
+
+```
+lib/
+  bets/
+    index.ts        ← export 専用。外から使うのはここだけ
+    bets.ts         ← 本体
+    bets.test.ts    ← テスト
+  race-name/
+    index.ts
+    race-name.ts
+    race-name.test.ts
+```
+
+ファイル数が増えても `lib/` 直下が膨らまない。責務が増えたら同じディレクトリに `types.ts`
+`constants.ts` のように足していく。**外から import するのは `index.ts` だけ**にして、中の
+ファイル構成を後から変えられるようにする。
+
+例外は `lib/utils.ts`。shadcn が `components.json` で `@/lib/utils` を参照しているため動かせない。
+
+## テスト
+
+**`lib/` に書くロジックには単体テストを書く。** 判定・計算・変換のように入力と出力が決まって
+いるものが対象。DB アクセスや画面は対象外。
+
+- テストランナーは **Node 組み込みの `node:test`**。外部のテストフレームワークは入れない
+- 本体の隣に `*.test.ts` で置き、`import { x } from "./bets.ts"` のように**拡張子付きで**
+  読む（素の Node で TypeScript を動かすため）
+- `pnpm test` で走る
+
 ## eve フレームワーク
 
 コードを書く前に、インストール済みの eve パッケージの該当ガイドを読むこと。通常は

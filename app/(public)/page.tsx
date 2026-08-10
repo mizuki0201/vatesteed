@@ -58,7 +58,6 @@ const stack = [
 
 const links = [
   { label: "note", note: "今後作成予定" },
-  { label: "ダッシュボード", note: "今後作成予定" },
   { label: "X", note: "今後作成予定" },
 ] as const;
 
@@ -88,11 +87,22 @@ export default function Page() {
           className="pointer-events-none absolute inset-x-0 -top-32 -z-10 h-72 bg-[radial-gradient(60%_100%_at_50%_0%,oklch(0.58_0.11_155/0.16),transparent_70%)]"
         />
         <p className="mb-6 text-6xl leading-none sm:text-7xl">🐎</p>
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Vatesteed</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Vatesteed</h1>
+          <span
+            className={`rounded-full border border-current/40 px-2.5 py-1 font-mono text-xs tracking-[0.2em] uppercase ${accent}`}
+          >
+            Beta
+          </span>
+        </div>
         <p className="mt-5 text-lg leading-relaxed text-muted-foreground sm:text-xl">
           膨大なデータを集めて解析する AI と、データに表れない文脈を読む人間。
           <br className="hidden sm:inline" />
           ふたりで競馬の予想を組み立てるエージェントです。
+        </p>
+        <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
+          🚧 現在は<span className="font-medium text-foreground">β版</span>
+          です。開発中のため、機能も構成も予告なく変わります。
         </p>
         <p className="mt-8 max-w-xl rounded-xl border border-border bg-card p-4 text-sm leading-relaxed text-muted-foreground">
           <span className="font-medium text-card-foreground">名前の由来</span>
@@ -226,7 +236,7 @@ export default function Page() {
       {/* リンク */}
       <section className="border-t border-border py-16">
         <SectionHeading eyebrow="Links" title="もっと知りたい方は" />
-        <ul className="grid gap-3 sm:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {links.map((link) => (
             <li
               key={link.label}

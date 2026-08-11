@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if grep -qE '\"file_path\" *: *\"[^\"]*agent/subagents/'; then mise exec -- pnpm --silent gen:agents; fi",
+            "statusMessage": ".claude/agents/ を生成し直しています",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

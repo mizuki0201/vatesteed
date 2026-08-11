@@ -18,11 +18,16 @@
 vatesteed/
   .claude/
     skills -> ../agent/skills   # Claude Code へのブリッジ（シンボリックリンク）
+    agents/                     # agent/subagents/ から生成。手で編集しない
+    settings.json               # 生成を走らせるフック
+  .githooks/
+    pre-commit                  # コミット時にも生成し直す（保険）
   agent/
     agent.ts
     instructions.md
     tools/          # lib/ を呼ぶ薄いラッパー
-    skills/
+    skills/         # オーケストレーターが使う手順
+    subagents/      # 分析する役（対象ごと）と検証する役
   app/
     (public)/
     (member)/
@@ -58,6 +63,23 @@ Claude Code で、Claude Code が読むのは `.claude/skills/` のため、`.cl
 
 Claude Code のスキャナがシンボリックリンクを辿ることは確認済み
 （`claude --plugin-dir ./.claude plugin details .claude` でスキルが列挙される）。
+
+### Claude Code へのサブエージェントのブリッジ
+
+役の実体も eve の規約どおり `agent/subagents/` に置く。ただし**こちらはシンボリックリンクでは
+なく生成**で写す。Claude Code が要求する frontmatter を eve 側のプロンプトに混ぜないため。
+
+生成するのは [lib/claude-agents/](../lib/claude-agents/)。編集直後（`.claude/settings.json` の
+フック）とコミット時（`.githooks/pre-commit`）の2箇所から走る。理由と経緯は
+[agent-design.md](agent-design.md#phase-1-で動かす2026-08-11-決定)。
+
+**clone したら一度だけ実行する:**
+
+```
+git config core.hooksPath .githooks
+```
+
+`.git/hooks/` はコミットできないため、フックの実体は `.githooks/` に置いて git に読ませている。
 
 ## 開発フェーズ
 

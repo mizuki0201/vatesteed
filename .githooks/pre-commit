@@ -1,0 +1,14 @@
+#!/bin/sh
+# agent/subagents/ の変更に合わせて .claude/agents/ を生成し直し、コミットに含める。
+#
+# 普段は Claude Code の PostToolUse フックが編集直後に生成するので、ここは取りこぼしの保険。
+# VSCode で直接編集したときや、フックが動かなかったときに効く。
+#
+# 有効にするには clone ごとに一度だけ実行する:
+#   git config core.hooksPath .githooks
+#
+# 生成に失敗したらコミットを止める。古い生成物が入るより、気づける方がよい。
+set -e
+
+mise exec -- pnpm --silent gen:agents
+git add .claude/agents

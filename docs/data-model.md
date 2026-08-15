@@ -114,7 +114,7 @@
 | `course_id` | bigint | FK → `courses` |
 | `meeting_number` | int | 開催回。海外・地方は null |
 | `meeting_day` | int | 日目。海外・地方は null |
-| `race_number` | int | 11R |
+| `race_number` | int | 11R。null 可 |
 | `race_name` | text | JRA正式名称のみ。条件戦は null |
 | `grade` | text | G1 など |
 | `weight_rule` | text | 馬齢 / 別定 / 定量 / ハンデ |
@@ -127,8 +127,14 @@
 md マスタで正式名称に直してからSQLを投げる（下記「レース名の扱い」）。
 
 **海外・地方のビッグレースも対象に含める。** 「第3回8日目」のような開催情報が無いため null 可。
+**`race_number` も同じ理由で null 可**（2026-08-15、
+[0003](../db/migrations/0003_races_race_number_nullable.sql)）。香港や地方のレースは、
+何レース目かが取れないことがある。
 
-- UNIQUE: `(race_date, course_id, race_number)`。同じレースの二重登録を塞ぐ
+- UNIQUE: `(race_date, course_id, race_number)`。同じレースの二重登録を塞ぐ。
+  **`race_number` が null の行は Postgres が互いに異なる値として扱うので、この守りは効かない。**
+  中央のレースは番号が埋まるので従来どおり塞がれ、緩むのは番号が取れないレースだけ。
+  そこは**登録の前に名前で探す**手順で守る
 
 ### `horses`
 

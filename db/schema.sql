@@ -6,6 +6,7 @@
 -- 適用済みマイグレーション:
 --   0001_initial.sql
 --   0002_entries_horse_number_nullable.sql
+--   0003_races_race_number_nullable.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -306,7 +307,7 @@ CREATE TABLE races (
   course_id        bigint                   NOT NULL,
   meeting_number   integer,
   meeting_day      integer,
-  race_number      integer                  NOT NULL,
+  race_number      integer,
   race_name        text,
   grade            text,
   weight_rule      text,

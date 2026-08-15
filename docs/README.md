@@ -7,6 +7,7 @@ Vatesteed の設計ドキュメント。
 | ファイル | 内容 |
 | --- | --- |
 | [product.md](product.md) | **最上流。** 何にしたいか、どういう運用があるか、実装との対応 |
+| [development.md](development.md) | **Vatesteed 自体を作る側の正本。** 開発の体制・役・進め方 |
 | [concept.md](concept.md) | 再現したい思考プロセス、設計思想、差別化 |
 | [architecture.md](architecture.md) | eve + Next.js + DB の構成、開発フェーズ、アクセス制御 |
 | [data-model.md](data-model.md) | スキーマの正本。22テーブル。ORM は使わず手書きSQLで流す |

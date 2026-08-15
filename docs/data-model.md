@@ -371,6 +371,18 @@ DB側に別名のテーブルは持たない。マスタは JRA の正式名称�
 - CHECK: `is_multi` を true にできるのは馬単・3連単だけ
 - CHECK: `unit_amount` は100円単位
 
+**一意制約は張らない。張れない。** 1レースに券種違いで複数本あるのが正常な形なので、
+`race_id` に一意を張ると正しい登録まで弾く。`(race_id, ticket_type, bet_style)` でも、
+同じ券種を金額違いで2本置く買い方を潰す。
+
+**その代わり、予想をやり直すと買い目が積み上がる。** 評価と予想（`*_notes` `*_predictions`
+`race_predictions`）は1対象1行で上書きされるので入れ直しても増えないが、**買い目だけは
+前の分が残る。** 合計金額が二重になり、回収率が壊れる。
+
+**やり直すときは、そのレースの買い目を消してから入れる。** 消す順序は `ai_bet_legs` →
+`ai_bets`（`ai_bet_legs.entry_id` が RESTRICT のため）。手順は
+[plan-bets](../agent/skills/plan-bets/SKILL.md)。**消す操作なので人間に断ってから実行する。**
+
 ### `ai_bet_legs` / `my_bet_legs`
 
 | カラム | 型 | 内容 |

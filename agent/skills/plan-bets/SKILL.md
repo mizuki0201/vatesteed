@@ -51,6 +51,26 @@ const r = expandBet({
 
 `unit_amount` は100円単位。`is_multi` を true にできるのは馬単と3連単だけ。
 
+## 書き込む前に、そのレースの買い目が既にあるか見る
+
+**`ai_bets` には一意制約が無い。** 1レースに券種違いで複数本あるのが正常なので、制約では
+塞げない。**同じレースに2回書くと、前の買い目が残ったまま積み上がる。** 合計金額が二重に
+なり、回収率がまるごと壊れる。
+
+```sql
+SELECT id, ticket_type, bet_style, total_amount FROM ai_bets WHERE race_id = $1;
+```
+
+**行があるなら、入れる前に消す。** 消すのは `ai_bet_legs` が先（`entry_id` が RESTRICT なので
+出走を参照している脚が残っていると消せない）。
+
+```sql
+DELETE FROM ai_bet_legs WHERE ai_bet_id IN (SELECT id FROM ai_bets WHERE race_id = $1);
+DELETE FROM ai_bets WHERE race_id = $1;
+```
+
+**消す操作なので、人間に断ってから実行する。** 買い目は回収率の元になる記録で、消すと戻らない。
+
 ## 書き込む
 
 1. `ai_bets` に1行（`race_id` / `ticket_type` / `bet_style` / `is_multi` / `unit_amount` /

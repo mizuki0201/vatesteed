@@ -240,12 +240,18 @@ frontmatter で持たせる必要があるが、eve は `instructions.md` を「
   編集したときや、フックが動かなかったときの取りこぼしを拾う。**clone ごとに一度
   `git config core.hooksPath .githooks` が要る**
 
-どちらも `mise exec` 経由で呼ぶ。フックは対話シェルではないため mise が有効になっておらず、
-そのままだと Node 22 が使われて TypeScript を直接読めない。
+どちらも `mise exec -- pnpm gen:agents` の形で書いてある。**ただし `mise exec` の前置きは
+今は何もしていない**（2026-08-16 に確認。この環境では包んでも Node が切り替わらない）。
+実際に効いているのは、`package.json` の各スクリプトが先頭で mise の shims を PATH の手前に
+足していること（[AGENTS.md の環境](../AGENTS.md#環境)）。**外すかどうかは決めていない。**
 
 **確かめたこと（2026-08-11）。** `.claude/agents/` は再帰的に読まれ、ディレクトリの
 シンボリックリンクも辿る。frontmatter 内の YAML コメントを置いても読み込みは壊れない。
 生成した8つの役が Claude Code から見えることを確認済み。
+
+**確かめ方。** 対象のディレクトリで
+`claude -p "List every agent type name you can delegate to."` を実行し、役の名前が出てくるかを
+見る。役を足したり生成の仕組みを変えたりしたときは、これで確認する。
 
 **Phase 1 と Phase 3 で違うところ。** Claude Code のスキルはセッション共通で、eve のように
 サブエージェント配下に閉じない。**「集めるスキルは分析役だけが持つ」という隔離は Phase 1 では

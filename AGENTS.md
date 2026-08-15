@@ -169,6 +169,11 @@ eve は beta のため、バージョンは `package.json` で完全固定して
   mise を有効にしていないシェル（エージェントが叩く非対話シェルなど）では PATH の手前に
   別の Node が来て、TypeScript を直接読めずに落ちるため。おかげで `pnpm test` などは
   そのまま叩いてよく、`mise exec` で包む必要はない
+- **`mise exec` で包んでも Node は切り替わらない**（2026-08-16 に確認。
+  `mise exec -- node -v` が素の Node と同じ v22 を返す）。効いているのは上の shims だけなので、
+  **落ちたときに `mise exec` を足して直そうとしない**
+- **`jq` と `timeout` が入っていない**（macOS）。フックやスクリプトの中で JSON を扱うときは
+  `grep` などで代替する
 
 ## データの扱い
 

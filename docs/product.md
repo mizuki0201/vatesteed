@@ -283,8 +283,12 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 
 ### 分析する役（`agent/subagents/`）
 
-**対象ごとに1つ。手順は各役の `instructions.md` が正本。** 中身を書いたのは entry-analyst と
-horse-analyst の2つ。残りは枠だけで未着手。
+**対象ごとに1つ。手順は各役の `instructions.md` が正本。** 中身を書いたのは分析する役の7つ
+すべて（2026-08-16）。**枠だけで残っているのは verifier だけ。**
+
+**ただし pedigree-analyst は動かせない。** 血統が DB に無く、役は外部サイトへアクセスしない
+ため、材料が渡されていなければ「材料が無い」と返して止まる（→
+[development.md の未決の問い](development.md#未決の問い)）。
 
 **horse-analyst は `horse_notes` を自分で書かない。** 対話で作ると決めた評価なので、見立てを
 返してオーケストレーターが書く（[data-model.md](data-model.md#ナレッジの型)）。
@@ -305,7 +309,7 @@ horse-analyst の2つ。残りは枠だけで未着手。
 | スキル | 立ち位置 | 書き込む先 | 手順の正本 |
 | --- | --- | --- | --- |
 | register-race | 進行役 | — | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
-| review-race | 進行役 | — | agent-design.md（**未記述**） |
+| review-race | 進行役 | — | [agent-design.md の振り返りの手順](agent-design.md#振り返りの手順2026-08-16-決定) |
 | predict-race | 予想 | `race_predictions` `ai_predictions` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | plan-bets | 予想 | `ai_bets` `ai_bet_legs` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | improve-agent | 常に働く | `docs/` `agent/` | agent-design.md（**未記述**） |
@@ -313,8 +317,9 @@ horse-analyst の2つ。残りは枠だけで未着手。
 | write-zenn-article | 発信 | — | publishing.md |
 | write-x-post | 発信 | — | publishing.md |
 
-**register-race / predict-race / plan-bets は中身を書いた**（2026-08-15）。残りは枠だけ。
-手順の正本を agent-design.md に書いてから、スキルをそこから書き起こす。
+**register-race / predict-race / plan-bets は中身を書いた**（2026-08-15）。**review-race も
+書いた**（2026-08-16）。残る improve-agent と発信の3つは枠だけ。手順の正本を agent-design.md か
+publishing.md に書いてから、スキルをそこから書き起こす。
 
 `agent/skills/` には開発で使う `task-management` も入っているが、製品の運用ではないので
 [development.md](development.md) 側で扱う。

@@ -104,9 +104,28 @@
   集まった情報を渡して呼び直す。往復が増える。止まった子を続きから再開する
   `experimental.subagentPersistentSessions` は**実験的機能**
 
-**複製の実務。** 集めるスキルの markdown は分析役の数だけ並ぶ。`.claude/skills` と同じように
-シンボリックリンクで1本にまとめられる可能性があるが、**eve の discovery がリンクを辿るかは
-未検証**。
+**複製の実務（2026-08-16 に検証）。** 集めるスキルの markdown は分析役の数だけ並ぶ。
+`.claude/skills` と同じようにシンボリックリンクで1本にまとめられるかを確かめた。
+**まとめられる。ただし `skills/` ディレクトリごとにしかできない。**
+
+| 張り方 | 結果 |
+| --- | --- |
+| `subagents/<id>/skills` 自体をリンクにする | **辿る。** リンク先のスキルがそのまま役に載る |
+| `subagents/<id>/skills/<名前>/` をリンクにする | **辿らない。** `discover/skill-entry-not-directory` で落ちる |
+| `subagents/<id>/skills/<名前>.md` をリンクにする | **辿らない。** 同じエラー |
+
+理由は discovery の実装にある。`skills/` があるかどうかは `stat()` で見るのでリンクの先まで
+辿るが、その中身は `readdir` の `withFileTypes` で取った項目を `isDirectory()` / `isFile()` で
+振り分けるため、**リンクはどちらにも当たらず弾かれる。**
+
+**確かめ方。** 使い捨ての eve プロジェクトを作り、`agent/subagents/` に4つの役を置いて、
+上の3つの張り方と実体のディレクトリを1つずつ持たせた。`eve info --json` を実行し、
+`.eve/discovery/agent-discovery-manifest.json` に載ったスキルと
+`.eve/discovery/diagnostics.json` のエラーを見た。eve は 0.31.3。
+
+**ここから決まること・決まらないこと。** 「1本を全役で共有する」形は作れる。一方、
+**役ごとに配るスキルを変えたいなら、リンクと実体を `skills/` の中で混ぜられないので複製が要る。**
+どちらを採るかは未決のまま（→ [development.md の未決の問い](development.md#未決の問い)）。
 
 ### 手順をどこに書くか（2026-08-11 決定）
 
@@ -136,27 +155,36 @@ eve では `instructions.md` は毎ターン読まれる恒久的な指示、ス
 
 ### 作った役（2026-08-11）
 
-`agent/subagents/` に8つ。**中身を書いたのは entry-analyst（2026-08-11）と
-horse-analyst（2026-08-15）の2つ。** 残りの6つは `agent.ts` と `instructions.md` の枠だけで、
-呼ばれても実行せず、未着手であることを返して止まる。
+`agent/subagents/` に8つ。**中身を書いたのは7つ**（entry-analyst は 2026-08-11、
+horse-analyst は 2026-08-15、残る5つは 2026-08-16）。**枠だけで残っているのは verifier だけ**で、
+これは呼ばれても実行せず、未着手であることを返して止まる。
 
-| 役 | 見るもの | 評価の行き先 |
-| --- | --- | --- |
-| [horse-analyst](../agent/subagents/horse-analyst/) | 1頭の馬を総合して評価する | `horse_notes` |
-| [pedigree-analyst](../agent/subagents/pedigree-analyst/) | 血統から適性の素地を読む | `pedigree_notes` |
-| [jockey-analyst](../agent/subagents/jockey-analyst/) | 騎手の乗り方・仕掛けどころ | `jockey_notes` |
-| [trainer-analyst](../agent/subagents/trainer-analyst/) | 厩舎の仕上げ方・ローテ | `trainer_notes` |
-| [course-analyst](../agent/subagents/course-analyst/) | コースの傾向 | `course_notes` |
-| [entry-analyst](../agent/subagents/entry-analyst/) | ある出走で何が起きたか | `entry_notes` |
-| [race-analyst](../agent/subagents/race-analyst/) | レースのレベル・展開・馬場 | `race_notes` |
-| [verifier](../agent/subagents/verifier/) | 分析の結果を蓄積と突き合わせる | 書かない。指摘を返す |
+| 役 | 見るもの | 評価の行き先 | 誰が書くか |
+| --- | --- | --- | --- |
+| [horse-analyst](../agent/subagents/horse-analyst/) | 1頭の馬を総合して評価する | `horse_notes` | オーケストレーター |
+| [pedigree-analyst](../agent/subagents/pedigree-analyst/) | 血統から適性の素地を読む | `pedigree_notes` | 役が直接 |
+| [jockey-analyst](../agent/subagents/jockey-analyst/) | 騎手の乗り方・仕掛けどころ | `jockey_notes` | 役が直接 |
+| [trainer-analyst](../agent/subagents/trainer-analyst/) | 厩舎の仕上げ方・ローテ | `trainer_notes` | 役が直接 |
+| [course-analyst](../agent/subagents/course-analyst/) | コースの傾向 | `course_notes` | 役が直接 |
+| [entry-analyst](../agent/subagents/entry-analyst/) | ある出走で何が起きたか | `entry_notes` | 役が直接 |
+| [race-analyst](../agent/subagents/race-analyst/) | レースのレベル・展開・馬場 | `race_notes` | 役が直接 |
+| [verifier](../agent/subagents/verifier/) | 分析の結果を蓄積と突き合わせる | 書かない。指摘を返す | — |
+
+**`horse_notes` 以外は役が直接書く（2026-08-16 決定）。** 対話で作ると宣言してあるのは
+`horse_notes` だけなので（[data-model.md](data-model.md#評価が書かれるきっかけ)）、それ以外は
+下の原則の「大量に発生し、機械的に決まるもの」側に寄せた。どれも1対象1行の上書きで、
+`author = 'AI'` の行しか書き換えられない1文を使うため、**人間の読みを塗り潰す経路にはならない。**
+
+**血統には材料が無い（2026-08-16 時点）。** `horses` の `sire_id` `dam_id` は全頭 null で、
+役は外部サイトへアクセスしない。**pedigree-analyst は中身を書いたが、渡されない限り遡る材料が
+無い**ので、当面は「材料が無い」と返して止まる。血統をどう入れるかは決めていない
+（→ [development.md の未決の問い](development.md#未決の問い)）。
 
 名前は英語のケバブケースで、**役割が分かる形**にした。eve ではディレクトリ名がそのまま
 オーケストレーターから見えるツール名になり、同名のツールがあるとビルドが落ちるため、
 ツール名と重ならないようにする。
 
-評価を誰が書き込むかは下記のとおり性質で分ける。枠だけの6つの `instructions.md` には
-「未決」と書いたままなので、中身を書くときに直す。
+評価を誰が書き込むかは下記のとおり性質で分ける。
 
 **`horse-analyst` は書き込まない。** `horse_notes` は対話で作ると決めているため、見立てを
 オーケストレーターへ返し、書くのはオーケストレーター。中身を書くときに、その役の評価が
@@ -408,6 +436,72 @@ RETURNING id;
 - 点数と金額は **`lib/bets` の `expandBet` で出した値だけを入れる**。手で数えない
   （[data-model.md](data-model.md#購入)）
 
+## 振り返りの手順（2026-08-16 決定）
+
+**レースが終わってから、評価を更新し切るまでの手順の正本。**
+[product.md の運用3](product.md#3-振り返るレース後)が「何をするか」で、ここが「どの順で
+やるか」。スキルの実体は [review-race](../agent/skills/review-race/)。
+
+### 予想と順序が逆になる
+
+```
+1. 結果を取り込む（着順・人気・オッズ・時計・通過順・馬場・天気）
+2. レースを評価する          ← race-analyst
+3. 出走を1つずつ読み直す      ← entry-analyst
+4. 馬の評価を更新する         ← horse-analyst の見立てを受けて対話で決める
+5. 予想と買い目の答え合わせをする
+6. 判断の誤りを直す
+```
+
+**予想では出走から馬へ積み上げたが、振り返りではレース全体から降ろす。** ペースがどうだったか、
+馬場がどちらに傾いていたか、レースそのものがどの程度の内容だったかが分からないまま1つの出走を
+読むと、**着順を説明するだけの話になる**。予想の時点ではそのレースがまだ走られていないので
+積み上げるしかなかったが、終わったあとは上から降ろせる。
+
+**1が終わるまで2へ進まない。** 通過順と上がり3Fが入っていない状態でレースを評価しても、
+記憶と印象で書くことになる。
+
+### 1. 結果を取り込む
+
+`entries` のレース後の列（`finish_position` `popularity` `win_odds` `finish_time_ms`
+`last_3f_ms` `corner_positions`）と、`races` の `weather` `track_condition` を埋める。
+
+- **走らなかった馬は `status` を直す**（取消・除外・中止・失格）。着順が入るのは `出走` の
+  ときだけで、CHECK 制約が効いている。人気とオッズには同じ縛りが無いので、中止・失格でも入れる
+- **降着があれば `finish_position` は降着後の確定着順**（[data-model.md](data-model.md#entries)）
+- 裏取りの基準は予想のときと同じ。**2回試して確からしい値が取れなければ、取れなかったと残す**
+
+### 5. 予想と買い目の答え合わせ
+
+**当たったかどうかではなく、どこで筋道が外れたかを見る。** 印は結論なので、印の当否だけを
+数えても次に効かない。
+
+- 予想の展開（`race_predictions.body`）と実際の隊列を突き合わせる。**各時点の隊列まで出して
+  あるので、どの地点から違ったかが分かる**（→ [予想の手順](#3-展開を組む)）
+- 的中と払戻は `ai_bets` の `payout` `refund` に入れる。**的中の判定と回収率は
+  [lib/bets](../lib/bets/) で出す。手で数えない**（[data-model.md](data-model.md#的中の判定)）
+- **買っていない馬券が当たっていたことを、外れの理由にしない。** 見るのは組み立ての筋道
+
+### 6. 判断の誤りを直す
+
+**残す先が2つある。何についての誤りかで決まる**（[product.md](product.md#学んで残す)）。
+
+| 気づいたこと | 残す先 |
+| --- | --- |
+| その馬・そのコース・その騎手の見方が変わった | 各 `*_notes` |
+| 見るべきものを見落としていた、順序が違った | `docs/` と `agent/skills/` |
+
+後者を直すのは `improve-agent` の担当だが、**このスキルはまだ中身が無い。** 書かれるまでは、
+振り返りの中で気づいたことを挙げるところまでをこの手順で行い、直すかどうかはオーケストレーター
+が対話で決める。
+
+### 止まるところ
+
+- **`author` が「人間」「対話」の評価は、単独で書き換えない。** 前の見方・新しい見方・何がどう
+  変わるのかを並べて合意を取る（[product.md](product.md#人間の読みは勝手に上書きしない)）
+- **結果が出たことを理由に、予想時点の評価をさかのぼって直さない。** 予想は枠順確定直後に
+  出したもので、回収率もそれで測ると決めてある（[data-model.md](data-model.md#予想と回収率)）
+
 ## 情報の集め方（2026-08-15 決定）
 
 ### 過去の出走をどこまで登録するか
@@ -506,7 +600,10 @@ Claude Code へのブリッジの張り方は
 **勝手に確定させないこと。**
 
 - 集めるスキルをどう配るか（各役の配下に複製するか、シンボリックリンクで1本にするか）。
-  **eve の discovery がリンクを辿るかは未検証**
+  **リンクが辿られるかは 2026-08-16 に検証済み**（→ [複製の実務](#集めること2026-08-11-決定)）。
+  どちらを採るかは決めていない
+- 血統の材料をどこから入れるか。`horses` の `sire_id` `dam_id` は空で、役は外部サイトへ
+  アクセスしない。**pedigree-analyst は書いたが動かせない**
 - 分析する役どうしの呼び出し関係・依存（どれがどれの結果を前提にするか）
 - オーケストレーターの `instructions.md` の内容
 - 各役が持つツールの範囲（`subagents/<id>/tools/`。継承しないので役ごとに要る）

@@ -1,13 +1,14 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { buildAgentMarkdown, extractDescription } from "./claude-agents.ts";
+import { buildAgentMarkdown, extractDescription, needsPhase1DbAccess } from "./claude-agents.ts";
 
 /**
  * `agent/subagents/` から `.claude/agents/` を生成し直す。
  *
  * - 正本は `agent/subagents/<id>/`。生成物は手で編集しない
  * - `<id>` がそのまま Claude Code 側の役の名前になる
+ * - Phase 1 限りの手段（`phase1-db-access.md`）は、対象の役の本文の末尾に足す
  * - 正本から消えた役の生成物は削除する（名前を変えたときに古いものが残らないように）
  * - 中身が変わらないファイルは書き直さない
  *
@@ -16,6 +17,7 @@ import { buildAgentMarkdown, extractDescription } from "./claude-agents.ts";
 
 const SUBAGENTS_DIR = fileURLToPath(new URL("../../agent/subagents", import.meta.url));
 const OUTPUT_DIR = fileURLToPath(new URL("../../.claude/agents", import.meta.url));
+const PHASE1_DB_ACCESS = fileURLToPath(new URL("./phase1-db-access.md", import.meta.url));
 
 /** 生成物だと分かる印。これが無いファイルは手書きとみなして消さない。 */
 const GENERATED_MARKER = "# このファイルは自動生成される";
@@ -38,6 +40,13 @@ export async function syncClaudeAgents(): Promise<SyncResult> {
   const entries = await readdir(SUBAGENTS_DIR, { withFileTypes: true }).catch(() => []);
   const ids = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 
+  // 読めなかったら落とす。足されないまま生成物を上書きするのが一番まずい
+  const phase1DbAccess = await readFile(PHASE1_DB_ACCESS, "utf8").catch((error: unknown) => {
+    throw new Error(`${path.relative(process.cwd(), PHASE1_DB_ACCESS)} を読めません。`, {
+      cause: error,
+    });
+  });
+
   await mkdir(OUTPUT_DIR, { recursive: true });
 
   const written: string[] = [];
@@ -58,7 +67,12 @@ export async function syncClaudeAgents(): Promise<SyncResult> {
       continue;
     }
 
-    const markdown = buildAgentMarkdown({ id, description, body });
+    const markdown = buildAgentMarkdown({
+      id,
+      description,
+      body,
+      appendix: needsPhase1DbAccess(id) ? phase1DbAccess : undefined,
+    });
     const outputPath = path.join(OUTPUT_DIR, `${id}.md`);
 
     if ((await readIfExists(outputPath)) === markdown) continue;

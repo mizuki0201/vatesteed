@@ -19,3 +19,6 @@ dist
 
 # タスク（手元だけの作業リスト。task-management スキルが読み書きする）
 docs/tasks/
+
+# SQL の一時ファイル。エージェントが pnpm db:query --file で使う
+tmp/

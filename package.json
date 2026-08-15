@@ -13,6 +13,7 @@
     "typecheck": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" tsc --noEmit -p tsconfig.json",
     "test": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node --test \"lib/**/*.test.ts\"",
     "gen:agents": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node lib/claude-agents/sync.ts",
+    "db:query": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node --env-file-if-exists=.env.local lib/db/query.ts",
     "db:migrate": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node --env-file-if-exists=.env.local lib/db/migrate.ts",
     "db:migrate:test": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node --env-file-if-exists=.env.migration-test lib/db/migrate.ts",
     "build:eve": "eve build",

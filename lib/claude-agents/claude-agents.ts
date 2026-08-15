@@ -44,15 +44,35 @@ export function extractDescription(agentSource: string): string | undefined {
 }
 
 /**
+ * Phase 1 限りの手段を足す役かどうかを判定する。
+ *
+ * `pnpm db:query` のような Phase 1 限りの手段は、役の `instructions.md`（Phase 3 で
+ * そのまま eve のプロンプトになる）ではなくブリッジ側に置き、生成のときに足している。
+ * Phase 3 ではこのブリッジごと捨てれば後始末が終わる。
+ *
+ * 足さないのは `dev-` で始まる開発の役。DB を触らないため。
+ */
+export function needsPhase1DbAccess(id: string): boolean {
+  return !id.startsWith("dev-");
+}
+
+/**
  * Claude Code のサブエージェント定義（frontmatter + 本文）を組み立てる。
  *
  * `name` と `description` が Claude Code の必須項目。`model` は書かない
  * （既定の `inherit` に任せる。eve 側は `agent.ts` の `model` を使う）。
+ *
+ * `appendix` を渡すと本文の末尾に空行を1つ挟んで足す。正本の `instructions.md` に
+ * 書きたくない、Claude Code 向けの補足をここから入れる。
+ *
+ * 末尾は `appendix` の有無によらず改行1つで閉じる。正本の末尾の空行の数で生成物が
+ * 変わらないようにするため。
  */
 export function buildAgentMarkdown(input: {
   readonly id: string;
   readonly description: string;
   readonly body: string;
+  readonly appendix?: string;
 }): string {
   const frontmatter = [
     "---",
@@ -63,5 +83,10 @@ export function buildAgentMarkdown(input: {
     "---",
   ].join("\n");
 
-  return `${frontmatter}\n\n${input.body.trimStart()}`;
+  const body =
+    input.appendix === undefined
+      ? input.body.trim()
+      : `${input.body.trim()}\n\n${input.appendix.trim()}`;
+
+  return `${frontmatter}\n\n${body}\n`;
 }

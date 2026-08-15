@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { getSql } from "./index.ts";
+import { query } from "./index.ts";
 
 /**
  * 任意の SQL を1文投げて、結果を JSON で返す入口。
@@ -15,7 +15,7 @@ import { getSql } from "./index.ts";
  * - **テーブルの形や権限を変える文は弾く。** スキーマの変更経路は `db/migrations/` と
  *   `pnpm db:migrate` に決めてあり、そこを迂回されると検証ブランチを通す手順ごと無くなる
  *
- * 接続は `getSql()`（HTTP 経由のプール接続）。複数の文をまたぐトランザクションは張れない
+ * 接続は `query()`（HTTP 経由のプール接続）。複数の文をまたぐトランザクションは張れない
  * ため、ここで扱うのは1文だけ。まとめて流すものは `db/migrations/` と `pnpm db:migrate`。
  *
  * 実行は `pnpm db:query`。
@@ -227,13 +227,10 @@ async function main() {
     // --file の中身も同じように見る。読んだあとに判定するのはそのため
     assertNotSchemaChange(sqlText);
 
-    const sql = getSql();
-    const result = await sql.query<false, true>(sqlText, [...args.params], {
-      fullResults: true,
-    });
+    const result = await query(sqlText, args.params);
 
     // 読む側はエージェントなので、飾りを付けずに JSON を1つだけ出す。行が0件でも同じ形。
-    // `Date` は JSON.stringify が ISO 8601 の文字列にする（Date.prototype.toJSON）
+    // `date` は `query()` が文字列のまま返すので、ここで日付がずれることはない
     process.stdout.write(`${JSON.stringify({ rowCount: result.rowCount, rows: result.rows })}\n`);
   } catch (error) {
     // 出すのはメッセージだけ。Postgres のエラーは detail に値が入ることがあり、

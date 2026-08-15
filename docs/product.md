@@ -147,6 +147,11 @@ Vatesteed の運用の中心は **「競馬について対話する」**（1）�
 | 関係するスキル | register-race → 各分析 → predict-race → plan-bets |
 
 馬券は実際に買わず、**購入ポートフォリオだけ出力して擬似的に購入**し回収率を計測する。
+**1レースあたりの予算は 2,000円で固定**し、レースの格や自信度で変えない（理由と手順は
+[agent-design.md](agent-design.md#5-買い目を組む)）。
+
+**各馬を読み終わるまで展開を組み始めない**、**展開は各時点の隊列まで出す**といった順序と
+粒度は [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) が正本。
 
 ### 3. 振り返る（レース後）
 
@@ -296,17 +301,17 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 
 | スキル | 立ち位置 | 書き込む先 | 手順の正本 |
 | --- | --- | --- | --- |
-| register-race | 進行役 | — | agent-design.md（**未記述**） |
+| register-race | 進行役 | — | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | review-race | 進行役 | — | agent-design.md（**未記述**） |
-| predict-race | 予想 | `race_predictions` `ai_predictions` | agent-design.md（**未記述**） |
-| plan-bets | 予想 | `ai_bets` `ai_bet_legs` | agent-design.md（**未記述**） |
+| predict-race | 予想 | `race_predictions` `ai_predictions` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
+| plan-bets | 予想 | `ai_bets` `ai_bet_legs` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | improve-agent | 常に働く | `docs/` `agent/` | agent-design.md（**未記述**） |
 | write-note-article | 発信 | — | publishing.md |
 | write-zenn-article | 発信 | — | publishing.md |
 | write-x-post | 発信 | — | publishing.md |
 
-**いずれも枠だけで中身が無い。** 手順の正本を agent-design.md に書いてから、スキルを
-そこから書き起こす。
+**register-race / predict-race / plan-bets は中身を書いた**（2026-08-15）。残りは枠だけ。
+手順の正本を agent-design.md に書いてから、スキルをそこから書き起こす。
 
 `agent/skills/` には開発で使う `task-management` も入っているが、製品の運用ではないので
 [development.md](development.md) 側で扱う。

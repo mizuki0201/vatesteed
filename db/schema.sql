@@ -5,6 +5,7 @@
 --
 -- 適用済みマイグレーション:
 --   0001_initial.sql
+--   0002_entries_horse_number_nullable.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -111,7 +112,7 @@ CREATE TABLE entries (
   jockey_id        bigint,
   trainer_id       bigint,
   bracket_number   integer,
-  horse_number     integer                  NOT NULL,
+  horse_number     integer,
   weight_carried   numeric(4,1),
   status           text                     NOT NULL,
   finish_position  integer,

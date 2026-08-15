@@ -283,8 +283,11 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 
 ### 分析する役（`agent/subagents/`）
 
-**対象ごとに1つ。手順は各役の `instructions.md` が正本。** entry-analyst だけ中身を書いた。
-残りは枠だけで未着手。
+**対象ごとに1つ。手順は各役の `instructions.md` が正本。** 中身を書いたのは entry-analyst と
+horse-analyst の2つ。残りは枠だけで未着手。
+
+**horse-analyst は `horse_notes` を自分で書かない。** 対話で作ると決めた評価なので、見立てを
+返してオーケストレーターが書く（[data-model.md](data-model.md#ナレッジの型)）。
 
 | 役 | 見るもの | 評価の行き先 |
 | --- | --- | --- |

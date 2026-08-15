@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Vatesteed — AI と人間で組み立てる競馬予想エージェント",
+  title: "Vatesteed — 人間の思考を学習していく競馬予想エージェント",
   description:
-    "膨大なデータを集めて解析する AI と、データに表れない文脈を読む人間。ふたりで競馬の予想を組み立てるエージェントです。",
+    "競馬ファンが数字の背後を読んでいる思考を、対話しながら AI に学習させていくエージェントです。",
 };
 
 const roles = [
@@ -44,6 +44,21 @@ const plans = [
   "先のビッグレースに向けて、出走が見込まれる馬の展望を分析する",
   "解釈を加える部分を、少しずつ AI 側に寄せていく",
   "ダッシュボードやスマートフォンからも操作できるようにする",
+] as const;
+
+const stages = [
+  {
+    when: "はじめのうち",
+    what: "人間が意識して知見を渡す",
+    detail:
+      "精度を上げることが目的です。何を学ぶべきか分かっていない段階では、ここを通らずに先へ行けません。",
+  },
+  {
+    when: "目指している形",
+    what: "対話の裏で、AI が自分で学習する",
+    detail:
+      "人間はただ競馬の話をしているだけ。学習のための作業を人間に発生させないことを、完成形の条件だと考えています。",
+  },
 ] as const;
 
 const stack = [
@@ -96,9 +111,9 @@ export default function Page() {
           </span>
         </div>
         <p className="mt-5 text-lg leading-relaxed text-muted-foreground sm:text-xl">
-          膨大なデータを集めて解析する AI と、データに表れない文脈を読む人間。
+          競馬ファンが数字の背後を読んでいる思考を、
           <br className="hidden sm:inline" />
-          ふたりで競馬の予想を組み立てるエージェントです。
+          対話しながら AI に学習させていくエージェントです。
         </p>
         <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
           🚧 現在は<span className="font-medium text-foreground">β版</span>
@@ -127,7 +142,13 @@ export default function Page() {
             </span>
           </p>
           <p>一方で、全馬の戦績を何年分も追いかけて突き合わせる作業は、人間には量が多すぎます。</p>
-          <p className="font-medium text-foreground">そこで役割を分けます。</p>
+          <p>
+            <span className="font-medium text-foreground">
+              この読み取りを AI ができるようにすることが、Vatesteed の目的です。
+            </span>
+            覚えさせたいのは「この馬は買い」という結論ではなく、そう考えるまでの筋道の方です。結論だけを覚えた形は、条件が変わった瞬間に効かなくなります。
+          </p>
+          <p className="font-medium text-foreground">そこで、いまは役割を分けています。</p>
         </div>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -142,6 +163,39 @@ export default function Page() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* 目指している形 */}
+      <section className="border-t border-border py-16">
+        <SectionHeading eyebrow="Goal" title="目指している形" />
+        <div className="space-y-5 leading-relaxed text-muted-foreground">
+          <p>
+            <span className="font-medium text-foreground">この分け方は固定ではありません。</span>
+            最終的に目指しているのは、人間が渡している解釈を AI 側が学習して引き受け、
+            <span className="font-medium text-foreground">完全に自動で動く形</span>です。
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {stages.map((stage) => (
+            <div
+              key={stage.when}
+              className="rounded-2xl border border-border bg-card p-6 text-card-foreground"
+            >
+              <p className={`font-mono text-xs tracking-[0.2em] uppercase ${accent}`}>
+                {stage.when}
+              </p>
+              <p className="mt-3 text-lg font-semibold tracking-tight">{stage.what}</p>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{stage.detail}</p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-8 leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">
+            この過程を一緒に作っていくこと自体を、プロジェクトの中身に据えています。
+          </span>
+        </p>
       </section>
 
       {/* どう実現するか */}

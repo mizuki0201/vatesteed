@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { ACCESS_LEVELS, type AccessLevel } from "../enums/index.ts";
-import { readSessionValue, safeEqual, SESSION_COOKIE_NAME } from "./session.ts";
+import { readSessionValue, SESSION_COOKIE_NAME } from "./session.ts";
 
 /**
  * いま見ている人の閲覧レベルを返す。**判定はここ1箇所に閉じる。**
@@ -34,18 +34,4 @@ function getDevViewer(): AccessLevel | undefined {
   const value = process.env.DEV_VIEWER;
 
   return ACCESS_LEVELS.find((level) => level === value);
-}
-
-/**
- * 入力されたパスワードが合っているかを見る。
- *
- * `OWNER_PASSWORD` が設定されていなければ、**何を入れても通さない**。設定漏れのときに
- * 空文字で通ってしまう形にしない。
- */
-export function checkOwnerPassword(input: string): boolean {
-  const expected = process.env.OWNER_PASSWORD;
-
-  if (!expected) return false;
-
-  return safeEqual(input, expected);
 }

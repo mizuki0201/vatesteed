@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell } from "@/components/screens/page-shell";
+import { Card, PageShell } from "@/components/screens/page-shell";
 import { getViewer } from "@/lib/auth";
 import { login, logout } from "./actions";
 
@@ -7,9 +7,17 @@ export const metadata: Metadata = { title: "ログイン — Vatesteed" };
 
 const MESSAGE: Readonly<Record<string, string>> = {
   "1": "パスワードが合いません。",
-  setup: "AUTH_SECRET が設定されていないので、まだログインできません。",
+  setup: "まだ設定が済んでいないため、ログインできません。",
 };
 
+/**
+ * ログインの入口。
+ *
+ * **有効期間を画面に書かない。** 読む人に得が無く、いつまで有効かを知らせるぶんだけ損がある。
+ * 切れたら入れ直してもらえばよい。
+ *
+ * **渡されたパスワードでレベルが決まる**ので、レベルを選ぶ欄も置かない。
+ */
 export default async function Page({
   searchParams,
 }: {
@@ -19,10 +27,7 @@ export default async function Page({
   const viewer = await getViewer();
 
   return (
-    <PageShell
-      lead="パスワードは1回だけ。合っていれば1年入れ直さずに済みます。"
-      title="ログイン"
-    >
+    <PageShell lead="渡されたパスワードによって、見えるものが変わります。" title="ログイン">
       {viewer === "public" ? (
         <form action={login} className="max-w-sm space-y-3">
           <input
@@ -58,6 +63,13 @@ export default async function Page({
           </form>
         </div>
       )}
+
+      <Card className="mt-8 max-w-sm">
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          <span className="font-medium text-card-foreground">この入り方は仮のものです。</span>
+          今後、別のやり方に変わることがあります。
+        </p>
+      </Card>
     </PageShell>
   );
 }

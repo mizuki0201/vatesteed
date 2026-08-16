@@ -7,9 +7,9 @@
     "#evals/*": "./evals/*"
   },
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
-    "start": "next start",
+    "build": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" next build",
+    "dev": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" next dev",
+    "start": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" next start",
     "typecheck": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" tsc --noEmit -p tsconfig.json",
     "test": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node --test \"lib/**/*.test.ts\"",
     "gen:agents": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node lib/claude-agents/sync.ts",

@@ -28,11 +28,11 @@ vatesteed/
     tools/          # lib/ を呼ぶ薄いラッパー
     skills/         # オーケストレーターが使う手順
     subagents/      # 分析する役（対象ごと）と検証する役
-  app/
-    (public)/
-    (member)/
-    (friend)/
-    (private)/
+  app/              # URL は内容だけで決める。閲覧レベルでディレクトリを分けない
+    about/          # Vatesteed の紹介
+    races/ horses/ jockeys/ trainers/ courses/
+    notes/ results/ dashboard/ tech/
+    login/ logout/
   evals/            # eve の eval。Phase 3 で使う
   lib/              # 実体のロジック・DBアクセス
   docs/
@@ -40,8 +40,7 @@ vatesteed/
   CLAUDE.md
 ```
 
-`agent/tools/` と `app/` の `(member)` `(friend)` `(private)` は、**枠だけ作って中身は空**
-（`.gitkeep` のみ）。tools を使うのは Phase 3。
+`agent/tools/` は**枠だけ作って中身は空**（`.gitkeep` のみ）。使うのは Phase 3。
 
 **`agent/schedules/` は作っていない。** eve の discovery は `schedules/` 配下のファイルを
 すべてスケジュール定義として読もうとするため、`.gitkeep` を置くと `eve dev` が
@@ -49,8 +48,9 @@ vatesteed/
 空ディレクトリは git に乗らないので、**最初のスケジュールを書く Phase 2 で作る**。
 `agent/tools/` は同じ置き方でも discovery が通ることを確認済み。
 
-`app/(public)/page.tsx` に Vatesteed の紹介ページを置き、`/` で常時表示している。eve の
-テンプレートに付いていたエージェントチャットは削除した。
+`/` は各画面へ入るためのまとめの画面で、Vatesteed の紹介は `/about` にある（2026-08-16 に
+分けた。それまでは紹介が `/` だった）。eve のテンプレートに付いていたエージェントチャットは
+削除した。
 
 `evals/` は枠と [検証したいことの頭出し](../evals/README.md) だけ。動かすのは Phase 3。
 
@@ -255,17 +255,59 @@ Neon をプロジェクトに接続する際の Environments は **Development /
 
 数値の重みを持たせると、後で間に有料プランを足せる。
 
-ルーティング:
+### ディレクトリでレベルを分けない（2026-08-16 決定）
 
-```
-app/(public)/   ← 0以上
-app/(member)/   ← 10以上
-app/(friend)/   ← 50以上
-app/(private)/  ← 100
-```
+**以前は `app/(member)/` `app/(friend)/` `app/(private)/` にページを置いてレベルを分ける形に
+していたが、やめた。** Next.js のルートグループは URL に出ないので同じ URL に解決してしまい、
+**異なるグループに同じ URL のページを置くとエラーになる**（`node_modules/next/dist/docs` の
+route-groups を参照）。この形だと「1つの画面はまるごと1つのレベル」しか表せず、**公開範囲を
+変えるたびにファイルが動いて URL が壊れる**。
 
-**初期実装**: `lib/auth/getViewer.ts` に判定を隔離し、環境変数のパスワード一致で `owner` を
-返すだけ。それ以外は `public`。テーブルは先に作るが、Phase 1 では参照しない。
+**公開範囲は動く前提で作る。** 代わりに3つを分ける。
+
+| 分けるもの | 置き場 | 変えるとどうなるか |
+| --- | --- | --- |
+| **URL** | `app/` の階層。内容だけで決める（`/horses/123`） | 変えない。記事から張ったリンクを壊さない |
+| **誰に何を見せるか** | [lib/access/](../lib/access/) の1つの表 | **公開範囲の変更は、この表の1行を書き換えるだけ** |
+| **判定** | [lib/auth/](../lib/auth/) の `getViewer()` と `lib/access` の `can()` / `assertCan()` | 入口を差し替えても、画面側は変わらない |
+
+**見せる単位はページではなく情報の種類**（`races` `results.mine` `notes.raw` など）。1つの画面の
+中で節ごとに出し分けられるので、「同じ馬のページを、member には評価まで、friend には自分の
+買い目まで」が表現できる。
+
+**判定はデータを取る手前で行う。** 画面で隠すだけにしない。Next.js のドキュメントが勧める
+形（Data Access Layer）に合わせて、DB を読む関数の中で `assertCan()` を呼ぶ。
+
+**ルートグループはレイアウトを分ける目的にだけ使う。** アクセス制御には使わない。
+
+**レイアウトで認可の判定をしない。** レイアウトは画面遷移で再実行されないため、そこに判定を
+置くと遷移で素通りする（Next.js のドキュメントに明記がある）。ナビゲーションの出し分けの
+ような表示の都合でレベルを読むのはよいが、**守りはデータ側に置く。**
+
+### 認証（2026-08-16 決定）
+
+**入口はパスワード1つ。1回入れたら1年触らなくてよい。**
+
+| | |
+| --- | --- |
+| 入口 | `/login` でパスワードを入れる。環境変数 `OWNER_PASSWORD` と一致したら `owner` |
+| 持ち方 | **署名付きの Cookie に、レベルと期限だけ**を入れる。`HttpOnly` / `Secure` / `SameSite=Lax` / `Path=/` |
+| 期限 | **1年。** 切れたときだけ入れ直す |
+| 署名 | `node:crypto` の HMAC-SHA256 + 環境変数 `AUTH_SECRET`。**依存は足さない**（中身は秘密ではなく、改ざんされなければよいため。暗号化が要るようになったら jose を検討する） |
+| 判定 | [lib/auth/](../lib/auth/) に隔離。React の `cache()` で1リクエストにつき1回だけ読む |
+| 開発中 | `.env.local` に `DEV_VIEWER=owner` を置くと認証を飛ばす。**本番では効かない**（`NODE_ENV` で塞ぐ） |
+| ログアウト | `/logout`。普段は使わない |
+
+**`proxy.ts`（Next.js 16 で `middleware` から改名）は認証に使わない。** ドキュメントが
+「セッション管理や認可の解決策にするな」と明示している。
+
+**割り切っていること。** パスワードは1つで、試行回数の制限も作っていない。長いランダムな
+文字列を使うことで済ませる。必要になったら Vercel の Firewall 側で足す。
+
+**将来の差し替え。** note のメンバーを入れるときは、**入口だけ**を Magic Link に替える。
+Cookie の形（署名付きでレベルを持つ）を変えなければ、画面もデータ取得も触らずに済む。
+
+`users` テーブルは作ってあるが、Phase 1 では参照しない。
 
 テーブル定義は [data-model.md](data-model.md) を参照。
 

@@ -328,14 +328,40 @@ publishing.md に書いてから、スキルをそこから書き起こす。
 
 ### 画面
 
-| ページ | 権限 | 映すもの | 元の docs |
-| --- | --- | --- | --- |
-| `app/(public)/` | public | Vatesteed の紹介 | product.md（何であるか） / concept.md |
-| `app/(member)/` | member | **未定** | — |
-| `app/(friend)/` | friend | **未定**（自分の収支など） | — |
-| `app/(private)/` | owner | **未定** | — |
+**まず読むだけの画面を一通り作る**（2026-08-16 決定）。書き込みは作らない。ナレッジを入れる
+導線は当面 Claude Code 経由のままで、画面から評価を直せるようにすると「人間が手で入力する」
+前提が画面側に固まってしまう（→ [やらないこと](#やらないこと)）。
 
-`(public)` 以外は枠だけで中身が無い。
+**URL は内容だけで決め、閲覧レベルは URL に出さない。** レベルは
+[lib/access/](../lib/access/) の表1つで持つので、**公開範囲を変えても URL は変わらない**。
+設計は [architecture.md のアクセス制御](architecture.md#アクセス制御)。
+
+| URL | 映すもの | レベル |
+| --- | --- | --- |
+| `/` | 各画面へ入るためのまとめ | public |
+| `/about` | Vatesteed の紹介 | public |
+| `/login` `/logout` | パスワードの入口 | public |
+| `/tech` | 技術情報のまとめ。構成と各技術画面へのリンク | public |
+| `/tech/database` | DB 設計。22テーブルの図と説明 | public |
+| `/races` | レースの一覧（検索できる） | member |
+| `/races/[id]` | **レース1枚。** 出走表・印・評価・展開の予想・買い目 | member |
+| `/results/ai` | AI の成績と回収率 | member |
+| `/horses` `/horses/[id]` | 馬の一覧と1枚（評価と出走の履歴） | friend |
+| `/jockeys` `/jockeys/[id]` | 騎手の一覧と1枚 | friend |
+| `/trainers` `/trainers/[id]` | 厩舎の一覧と1枚 | friend |
+| `/courses` `/courses/[id]` | コースの一覧と1枚 | friend |
+| `/results/mine` | 自分の成績と収支 | friend |
+| `/notes` | 蓄積の横断一覧。7種類の評価を更新日順に | owner |
+| `/dashboard` | 裏側。誰にどこを見せているかの一覧 | owner |
+
+**レベルは動かす前提。** 馬・騎手・厩舎・コースを friend にしてあるのは今の判断で、
+後から member へ降ろす可能性がある。
+
+**一覧の画面には検索を付ける。** 馬名・騎手名・厩舎名・レース名を、部分一致で探せるように
+する。
+
+**技術情報の画面は静的。** DB から引かず、書いた内容をそのまま置く。**最終更新日を画面に
+出す**ことで、情報が古いかどうかを読む人が判断できるようにする。
 
 ---
 

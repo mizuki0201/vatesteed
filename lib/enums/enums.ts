@@ -118,6 +118,17 @@ export const TICKET_TYPES = [
 ] as const;
 export type TicketType = (typeof TICKET_TYPES)[number];
 
+/**
+ * レースの確定払戻に出てくる券種。
+ *
+ * **WIN5 が入らない**ぶんだけ `TICKET_TYPES` と違う。WIN5 は5レースをまたぐもので、
+ * 1つのレースの払戻ではない（[data-model.md](../../docs/data-model.md#race_payouts)）。
+ */
+export const PAYOUT_TICKET_TYPES = TICKET_TYPES.filter(
+  (type) => type !== "WIN5",
+) as readonly Exclude<TicketType, "WIN5">[];
+export type PayoutTicketType = (typeof PAYOUT_TICKET_TYPES)[number];
+
 /** 人間が読むためのラベル。買い目の展開には使わない（docs/decisions/0003）。 */
 export const BET_STYLES = ["単点", "ボックス", "流し", "フォーメーション"] as const;
 export type BetStyle = (typeof BET_STYLES)[number];

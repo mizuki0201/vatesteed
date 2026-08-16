@@ -26,13 +26,23 @@ description: レースが終わったあと、結果の取り込みから評価�
 **ここが終わるまで 2 へ進まない。** 通過順と上がり3Fが入っていない状態で評価すると、印象で
 書くことになる。
 
-埋めるのは `entries` のレース後の列（`finish_position` `popularity` `win_odds`
-`finish_time_ms` `last_3f_ms` `corner_positions`）と、`races` の `weather` `track_condition`。
+埋めるのは3か所。
+
+| 入れる先 | 何を |
+| --- | --- |
+| `entries` | `finish_position` `margin` `popularity` `win_odds` `finish_time_ms` `last_3f_ms` `corner_positions` `body_weight` `body_weight_diff` |
+| `races` | `weather` `track_condition` |
+| `race_payouts` | **確定払戻。** 券種ごとに、当たった組み合わせ・100円あたりの払戻金・人気 |
 
 - **走らなかった馬は `status` を直す**（取消・除外・中止・失格）。着順が入るのは `出走` の
   ときだけで、CHECK 制約が効いている。**人気とオッズには同じ縛りが無い**ので、中止・失格でも
   分かっているなら入れる
 - **降着があれば、入れるのは降着後の確定着順**
+- `margin` は「クビ」「1.1/2」のような文字のまま入れる。**1着は空**
+- `race_payouts` の `combination` は、**枠連だけ枠番、それ以外は馬番**。同着があると同じ券種で
+  複数行になる
+- **確定払戻は回収率の計算には使わない**（回収率は `ai_bets` から出す）。画面に出すためと、
+  検算のために入れる
 - SQL は `pnpm db:query`。値は必ず `--params` で渡す
 - 裏取りの基準は予想のときと同じ。**2回試して確からしい値が取れなければ、取れなかったと残す**
 

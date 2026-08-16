@@ -37,7 +37,7 @@ export default async function Page({
                     </span>
                   </div>
                   <p className="mt-1 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
-                    出走 {horse.entryCount} · {horse.hasNote ? "評価あり" : "評価なし"}
+                    出走 {horse.entryCount} · {horse.hasNote ? "見立てあり" : "見立てなし"}
                   </p>
                 </Card>
               </Link>

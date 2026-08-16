@@ -54,6 +54,11 @@ export type RaceEntry = {
   readonly popularity: number | null;
   readonly winOdds: string | null;
   readonly cornerPositions: string | null;
+  readonly finishTimeMs: number | null;
+  readonly last3fMs: number | null;
+  readonly margin: string | null;
+  readonly bodyWeight: number | null;
+  readonly bodyWeightDiff: number | null;
   readonly horseId: string;
   readonly horseName: string;
   readonly sex: string | null;
@@ -181,6 +186,7 @@ export async function listRaceEntries(raceId: string): Promise<readonly RaceEntr
   const { rows } = await query(
     `SELECT e.id, e.bracket_number, e.horse_number, e.weight_carried, e.status,
             e.finish_position, e.popularity, e.win_odds, e.corner_positions,
+            e.finish_time_ms, e.last_3f_ms, e.margin, e.body_weight, e.body_weight_diff,
             h.id AS horse_id, h.name AS horse_name, h.sex, h.birth_year,
             j.id AS jockey_id, j.name AS jockey_name,
             t.id AS trainer_id, t.name AS trainer_name,
@@ -215,6 +221,11 @@ function toRaceEntry(row: Record<string, unknown>): RaceEntry {
     popularity: (row.popularity as number | null) ?? null,
     winOdds: row.win_odds === null ? null : String(row.win_odds),
     cornerPositions: (row.corner_positions as string | null) ?? null,
+    finishTimeMs: (row.finish_time_ms as number | null) ?? null,
+    last3fMs: (row.last_3f_ms as number | null) ?? null,
+    margin: (row.margin as string | null) ?? null,
+    bodyWeight: (row.body_weight as number | null) ?? null,
+    bodyWeightDiff: (row.body_weight_diff as number | null) ?? null,
     horseId: String(row.horse_id),
     horseName: String(row.horse_name),
     sex: (row.sex as string | null) ?? null,
@@ -231,6 +242,55 @@ function toRaceEntry(row: Record<string, unknown>): RaceEntry {
     horseNote: (row.horse_note as string | null) ?? null,
     horseNoteAuthor: (row.horse_note_author as string | null) ?? null,
   };
+}
+
+export type RacePayout = {
+  readonly ticketType: string;
+  readonly combination: string;
+  readonly amount: number;
+  readonly popularity: number | null;
+};
+
+/**
+ * そのレースの確定払戻。**券種の並びは JRA の発表と同じ順**にする。
+ *
+ * DB の並び順は入れた順なので、こちらで並べ替える。人が見慣れた順でないと探しにくい。
+ */
+const TICKET_ORDER = [
+  "単勝",
+  "複勝",
+  "枠連",
+  "馬連",
+  "ワイド",
+  "馬単",
+  "3連複",
+  "3連単",
+] as const;
+
+export async function listRacePayouts(raceId: string): Promise<readonly RacePayout[]> {
+  await assertCan("races");
+
+  const { rows } = await query(
+    `SELECT ticket_type, combination, amount, popularity
+       FROM race_payouts
+      WHERE race_id = $1`,
+    [raceId],
+  );
+
+  return rows
+    .map((row) => ({
+      ticketType: String(row.ticket_type),
+      combination: String(row.combination),
+      amount: Number(row.amount),
+      popularity: (row.popularity as number | null) ?? null,
+    }))
+    .sort((a, b) => {
+      const order =
+        TICKET_ORDER.indexOf(a.ticketType as (typeof TICKET_ORDER)[number]) -
+        TICKET_ORDER.indexOf(b.ticketType as (typeof TICKET_ORDER)[number]);
+
+      return order !== 0 ? order : a.combination.localeCompare(b.combination);
+    });
 }
 
 /** そのレースの買い目。列（`ai_bet_legs`）も一緒に組み立てて返す。 */

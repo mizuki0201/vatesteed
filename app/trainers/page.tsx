@@ -35,7 +35,7 @@ export default async function Page({
                     ) : null}
                   </div>
                   <p className="mt-1 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
-                    管理馬 {trainer.horseCount} · {trainer.hasNote ? "評価あり" : "評価なし"}
+                    管理馬 {trainer.horseCount} · {trainer.hasNote ? "見立てあり" : "見立てなし"}
                   </p>
                 </Card>
               </Link>

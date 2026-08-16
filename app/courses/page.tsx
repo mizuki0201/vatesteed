@@ -38,7 +38,7 @@ export default async function Page({
                     {course.turn}回り{course.layout ? `・${course.layout}` : ""}
                   </span>
                   <p className="mt-1 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
-                    レース {course.raceCount} · {course.hasNote ? "評価あり" : "評価なし"}
+                    レース {course.raceCount} · {course.hasNote ? "見立てあり" : "見立てなし"}
                   </p>
                 </Card>
               </Link>

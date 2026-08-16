@@ -15,7 +15,7 @@ const NAV: readonly { href: string; label: string; capability: Capability }[] = 
   { href: "/trainers", label: "厩舎", capability: "trainers" },
   { href: "/courses", label: "コース", capability: "courses" },
   { href: "/results/ai", label: "成績", capability: "results.ai" },
-  { href: "/notes", label: "蓄積", capability: "notes.raw" },
+  { href: "/notes", label: "読み", capability: "notes.raw" },
   { href: "/dashboard", label: "裏側", capability: "dashboard" },
 ];
 

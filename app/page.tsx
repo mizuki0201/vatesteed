@@ -29,13 +29,13 @@ const GROUPS: readonly { readonly heading: string; readonly entries: readonly En
       {
         href: "/races",
         title: "レース",
-        body: "出走表・印・各馬の評価・展開の予想・買い目を1枚で見る",
+        body: "出馬表・着順・払戻と、AI が読んだ内容を1枚で見る",
         capability: "races",
       },
       {
         href: "/results/ai",
         title: "AI の成績",
-        body: "擬似的に買った馬券の回収率。レースごとの内訳つき",
+        body: "買ったつもりの馬券の回収率。レースごとの内訳つき",
         capability: "results.ai",
       },
       {
@@ -49,14 +49,14 @@ const GROUPS: readonly { readonly heading: string; readonly entries: readonly En
   {
     heading: "蓄積",
     entries: [
-      { href: "/horses", title: "馬", body: "評価と、出走ごとの読み", capability: "horses" },
+      { href: "/horses", title: "馬", body: "どういう馬かの見立てと、レースごとの読み", capability: "horses" },
       { href: "/jockeys", title: "騎手", body: "乗り方の癖と騎乗の履歴", capability: "jockeys" },
       { href: "/trainers", title: "厩舎", body: "仕上げ方とローテーション", capability: "trainers" },
       { href: "/courses", title: "コース", body: "コースごとの傾向", capability: "courses" },
       {
         href: "/notes",
-        title: "評価の横断一覧",
-        body: "7種類の評価を更新の新しい順に並べる",
+        title: "書きためた読み",
+        body: "馬・騎手・厩舎・コースの見立てを、新しい順に並べる",
         capability: "notes.raw",
       },
     ],

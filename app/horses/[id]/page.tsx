@@ -37,19 +37,19 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
       }
       title={horse.name}
     >
-      <Section note="1頭1行の上書き（horse_notes）" title="どういう馬か">
+      <Section note="いま時点の見立て。新しく分かったら書き換えます" title="どういう馬か">
         {horse.note ? (
           <Card>
             <NoteBody author={horse.note.author} body={horse.note.body} />
           </Card>
         ) : (
           <Empty>
-            まだ評価が入っていません。出走ごとの読みが溜まってから、対話で作ります。
+            まだ書いていません。レースごとの読みが溜まってから、人と話しながら決めます。
           </Empty>
         )}
       </Section>
 
-      <Section note="pedigree_notes" title="血統">
+      <Section note="血統から読める適性の素地" title="血統">
         {horse.pedigreeNote ? (
           <Card>
             {horse.pedigreeNote.scope ? (
@@ -61,12 +61,12 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
           </Card>
         ) : (
           <Empty>
-            血統の評価はまだありません。血統そのものが DB に入っていないため、いまは読めません。
+            まだ書いていません。血統そのものを登録していないので、いまは読めません。
           </Empty>
         )}
       </Section>
 
-      <Section note="新しい順（entry_notes）" title="出走">
+      <Section note="新しい順" title="出走したレース">
         {entries.length === 0 ? (
           <Empty>出走が登録されていません。</Empty>
         ) : (
@@ -105,7 +105,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
                       <NoteBody author={entry.noteAuthor ?? "AI"} body={entry.note} />
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs text-muted-foreground">この出走の読みはまだです。</p>
+                    <p className="mt-2 text-xs text-muted-foreground">この走りについてはまだ書いていません。</p>
                   )}
                 </Card>
               </li>

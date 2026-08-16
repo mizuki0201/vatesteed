@@ -21,19 +21,19 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
       lead={trainer.affiliation ?? undefined}
       title={trainer.name}
     >
-      <Section note="1つ1行の上書き（trainer_notes）" title="仕上げ方とローテーション">
+      <Section note="いま時点の見立て。新しく分かったら書き換えます" title="仕上げ方とローテーション">
         {trainer.note ? (
           <Card>
             <NoteBody author={trainer.note.author} body={trainer.note.body} />
           </Card>
         ) : (
-          <Empty>まだ評価が入っていません。</Empty>
+          <Empty>まだ書いていません。</Empty>
         )}
       </Section>
 
-      <Section note="馬の現在の所属で引いている（転厩した馬は今の厩舎に出る）" title="管理馬">
+      <Section note="いまこの厩舎にいる馬。転厩した馬は移った先に出ます" title="管理馬">
         {horses.length === 0 ? (
-          <Empty>登録された管理馬がありません。</Empty>
+          <Empty>まだ登録されていません。</Empty>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
             {horses.map((horse) => (

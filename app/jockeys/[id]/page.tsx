@@ -26,19 +26,19 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
       }
       title={jockey.name}
     >
-      <Section note="1人1行の上書き（jockey_notes）" title="乗り方">
+      <Section note="いま時点の見立て。新しく分かったら書き換えます" title="乗り方">
         {jockey.note ? (
           <Card>
             <NoteBody author={jockey.note.author} body={jockey.note.body} />
           </Card>
         ) : (
-          <Empty>まだ評価が入っていません。</Empty>
+          <Empty>まだ書いていません。</Empty>
         )}
       </Section>
 
-      <Section note="新しい順" title="騎乗">
+      <Section note="新しい順" title="乗ったレース">
         {rides.length === 0 ? (
-          <Empty>登録された騎乗がありません。</Empty>
+          <Empty>まだ登録されていません。</Empty>
         ) : (
           <ul className="space-y-2">
             {rides.map((ride) => (

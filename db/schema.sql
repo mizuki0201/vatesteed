@@ -7,6 +7,8 @@
 --   0001_initial.sql
 --   0002_entries_horse_number_nullable.sql
 --   0003_races_race_number_nullable.sql
+--   0004_entries_body_weight.sql
+--   0005_race_payouts_and_margin.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -124,9 +126,13 @@ CREATE TABLE entries (
   corner_positions text,
   created_at       timestamp with time zone NOT NULL DEFAULT now(),
   updated_at       timestamp with time zone NOT NULL DEFAULT now(),
+  body_weight      integer,
+  body_weight_diff integer,
+  margin           text,
   CONSTRAINT entries_pkey PRIMARY KEY (id),
   CONSTRAINT entries_race_horse_key UNIQUE (race_id, horse_id),
   CONSTRAINT entries_race_number_key UNIQUE (race_id, horse_number),
+  CONSTRAINT entries_body_weight_check CHECK ((body_weight > 0)),
   CONSTRAINT entries_bracket_number_check CHECK (((bracket_number >= 1) AND (bracket_number <= 8))),
   CONSTRAINT entries_finish_only_when_ran CHECK (((status = '出走'::text) OR (finish_position IS NULL))),
   CONSTRAINT entries_finish_position_check CHECK ((finish_position > 0)),
@@ -288,6 +294,22 @@ CREATE TABLE race_notes (
   CONSTRAINT race_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
 );
 
+CREATE TABLE race_payouts (
+  id          bigserial                NOT NULL,
+  race_id     bigint                   NOT NULL,
+  ticket_type text                     NOT NULL,
+  combination text                     NOT NULL,
+  amount      integer                  NOT NULL,
+  popularity  integer,
+  created_at  timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at  timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT race_payouts_pkey PRIMARY KEY (id),
+  CONSTRAINT race_payouts_natural_key UNIQUE (race_id, ticket_type, combination),
+  CONSTRAINT race_payouts_amount_check CHECK ((amount > 0)),
+  CONSTRAINT race_payouts_popularity_check CHECK ((popularity > 0)),
+  CONSTRAINT race_payouts_ticket_type_check CHECK ((ticket_type = ANY (ARRAY['単勝'::text, '複勝'::text, '枠連'::text, '馬連'::text, '馬単'::text, 'ワイド'::text, '3連複'::text, '3連単'::text])))
+);
+
 CREATE TABLE race_predictions (
   id           bigserial                NOT NULL,
   race_id      bigint                   NOT NULL,
@@ -389,6 +411,7 @@ ALTER TABLE my_predictions ADD CONSTRAINT my_predictions_entry_id_fkey FOREIGN K
 ALTER TABLE my_predictions ADD CONSTRAINT my_predictions_mark_id_fkey FOREIGN KEY (mark_id) REFERENCES marks(id) ON DELETE RESTRICT;
 ALTER TABLE pedigree_notes ADD CONSTRAINT pedigree_notes_horse_id_fkey FOREIGN KEY (horse_id) REFERENCES horses(id) ON DELETE CASCADE;
 ALTER TABLE race_notes ADD CONSTRAINT race_notes_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE;
+ALTER TABLE race_payouts ADD CONSTRAINT race_payouts_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE;
 ALTER TABLE race_predictions ADD CONSTRAINT race_predictions_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE;
 ALTER TABLE races ADD CONSTRAINT races_course_id_fkey FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE RESTRICT;
 ALTER TABLE trainer_notes ADD CONSTRAINT trainer_notes_trainer_id_fkey FOREIGN KEY (trainer_id) REFERENCES trainers(id) ON DELETE CASCADE;
@@ -407,6 +430,7 @@ CREATE INDEX horses_sire_id_idx ON public.horses USING btree (sire_id);
 CREATE INDEX horses_trainer_id_idx ON public.horses USING btree (trainer_id);
 CREATE INDEX jockeys_name_idx ON public.jockeys USING btree (name);
 CREATE INDEX my_bets_race_id_idx ON public.my_bets USING btree (race_id);
+CREATE INDEX race_payouts_race_id_idx ON public.race_payouts USING btree (race_id);
 CREATE INDEX races_course_id_idx ON public.races USING btree (course_id);
 CREATE INDEX races_race_date_idx ON public.races USING btree (race_date);
 CREATE INDEX trainers_name_idx ON public.trainers USING btree (name);
@@ -430,6 +454,7 @@ CREATE TRIGGER my_bets_set_updated_at BEFORE UPDATE ON public.my_bets FOR EACH R
 CREATE TRIGGER my_predictions_set_updated_at BEFORE UPDATE ON public.my_predictions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER pedigree_notes_set_updated_at BEFORE UPDATE ON public.pedigree_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER race_notes_set_updated_at BEFORE UPDATE ON public.race_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER race_payouts_set_updated_at BEFORE UPDATE ON public.race_payouts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER race_predictions_set_updated_at BEFORE UPDATE ON public.race_predictions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER races_set_updated_at BEFORE UPDATE ON public.races FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trainer_notes_set_updated_at BEFORE UPDATE ON public.trainer_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();

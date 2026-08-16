@@ -21,22 +21,21 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
       lead={`${course.turn}回り${course.layout ? `・${course.layout}` : ""} · 登録されているレース ${races.length} 件`}
       title={`${course.track} ${course.surface}${course.distanceM}m`}
     >
-      <Section note="1つ1行の上書き（course_notes）" title="コースの傾向">
+      <Section note="いま時点の見立て。新しく分かったら書き換えます" title="コースの傾向">
         {course.note ? (
           <Card>
             <NoteBody author={course.note.author} body={course.note.body} />
           </Card>
         ) : (
           <Empty>
-            まだ評価が入っていません。1つのレースでは傾向が出ないので、開催をまたいで溜まってから
-            書きます。
+            まだ書いていません。1回のレースでは傾向が出ないので、何回か溜まってから書きます。
           </Empty>
         )}
       </Section>
 
       <Section note="このコースで行われたレース" title="レース">
         {races.length === 0 ? (
-          <Empty>登録されたレースがありません。</Empty>
+          <Empty>まだ登録されていません。</Empty>
         ) : (
           <ul className="space-y-2">
             {races.map((race) => (
@@ -61,9 +60,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
                         </span>
                       ) : null}
                       {race.hasNote ? (
-                        <span className="ml-auto font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
-                          評価あり
-                        </span>
+                        <span className="ml-auto text-xs text-muted-foreground">振り返り済み</span>
                       ) : null}
                     </div>
                   </Card>

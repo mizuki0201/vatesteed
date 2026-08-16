@@ -50,7 +50,18 @@ export function NoteBody({
   );
 }
 
-/** 書いた人の印。人間が触った行を目立たせる。 */
+/**
+ * 書いた人の印。人が触ったものを目立たせる。
+ *
+ * **DB に入っている値をそのまま出さない。** `対話` のような言葉は中の都合で、読む人には
+ * 何のことか分からない。画面では意味の分かる言い方にする。
+ */
+const AUTHOR_LABEL: Readonly<Record<string, string>> = {
+  AI: "AI が書いた",
+  人間: "人が書いた",
+  対話: "AI と人で決めた",
+};
+
 export function AuthorBadge({ author }: { readonly author: string }) {
   const tone =
     author === "AI"
@@ -58,13 +69,8 @@ export function AuthorBadge({ author }: { readonly author: string }) {
       : "border-current/40 text-[oklch(0.5_0.12_155)] dark:text-[oklch(0.74_0.11_155)]";
 
   return (
-    <span
-      className={cn(
-        "inline-block rounded-full border px-2 py-0.5 font-mono text-[10px] tracking-[0.15em] uppercase",
-        tone,
-      )}
-    >
-      {author}
+    <span className={cn("inline-block rounded-full border px-2 py-0.5 text-[10px]", tone)}>
+      {AUTHOR_LABEL[author] ?? author}
     </span>
   );
 }

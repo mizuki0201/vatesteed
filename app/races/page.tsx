@@ -45,7 +45,7 @@ export default async function Page({
                       {race.distanceM}m · {race.entryCount}頭
                     </span>
                     <span className="ml-auto flex gap-2 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
-                      {race.hasPrediction ? <span>予想あり</span> : null}
+                      {race.hasPrediction ? <span>予想した</span> : null}
                       {race.hasResult ? <span>結果あり</span> : null}
                     </span>
                   </div>

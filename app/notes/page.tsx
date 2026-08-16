@@ -5,12 +5,12 @@ import { NoteBody } from "@/components/screens/note-body";
 import { SearchForm } from "@/components/screens/search-form";
 import { countNotesByKind, listNotes, NOTE_KINDS, NOTE_KIND_LABEL, type NoteKind } from "@/lib/notes";
 
-export const metadata: Metadata = { title: "評価の横断一覧 — Vatesteed" };
+export const metadata: Metadata = { title: "書きためた読み — Vatesteed" };
 
 /**
- * 7種類の評価を1つの並びで見る画面。
+ * 書きためた読みを、対象をまたいで1つの並びで見る画面。
  *
- * **更新の新しい順**にしてあるのは、「古い評価が今も生きているか」を見つけるため。
+ * **更新の新しい順**にしてあるのは、「昔の見立てが今も通用するか」を見つけるため。
  */
 export default async function Page({
   searchParams,
@@ -30,8 +30,8 @@ export default async function Page({
   return (
     <PageShell
       actions={<SearchForm action="/notes" defaultValue={q} placeholder="対象名・本文" />}
-      lead={`全部で ${total} 件。更新の新しい順に並べています。`}
-      title="評価の横断一覧"
+      lead={`${total} 件。新しく書いたものから並べています。`}
+      title="書きためた読み"
     >
       <div className="mb-6 flex flex-wrap gap-2 text-sm">
         <FilterLink count={total} current={selected} kind={undefined} q={q} />
@@ -42,7 +42,7 @@ export default async function Page({
 
       {notes.length === 0 ? (
         <Empty>
-          {q ? `「${q}」に当たる評価はありません。` : "まだ評価が溜まっていません。"}
+          {q ? `「${q}」に当たるものはありません。` : "まだ何も書いていません。"}
         </Empty>
       ) : (
         <ul className="space-y-2">

@@ -5,7 +5,8 @@
 **このドキュメントがスキーマの正本で、SQL はそれを流すためのもの。** ORM は使わない
 （[decisions/0004](decisions/0004-migrations-without-orm.md)）。
 
-**2026-08-09 に本番へ適用済み**（`migration-test` ブランチで通してから流した）。22テーブル。
+**2026-08-09 に本番へ適用済み**（`migration-test` ブランチで通してから流した）。当初22テーブル、
+現在24。
 
 このドキュメントは**何をどう持つか（設計）**の正本で、**今DBに何があるか**は
 [db/schema.sql](../db/schema.sql) を見る。あちらは `pnpm db:migrate` が毎回書き出す生成物
@@ -59,15 +60,18 @@
 [compliance.md](compliance.md) の方針で自動収集にあたるため、**確実に取得できる経路が無い**。
 後から必要になったらカラムを1本足すだけで済む。
 
-### テーブル一覧（22）
+### テーブル一覧（24）
 
 | 分類 | テーブル |
 | --- | --- |
 | 土台（6） | `courses` `races` `horses` `jockeys` `trainers` `entries` |
-| 評価（7） | `entry_notes` `horse_notes` `pedigree_notes` `jockey_notes` `trainer_notes` `course_notes` `race_notes` |
+| 評価（8） | `entry_notes` `horse_notes` `pedigree_notes` `progeny_notes` `jockey_notes` `trainer_notes` `course_notes` `race_notes` |
 | 予想（4） | `marks` `ai_predictions` `my_predictions` `race_predictions` |
 | 購入（4） | `ai_bets` `ai_bet_legs` `my_bets` `my_bet_legs` |
+| 確定払戻（1） | `race_payouts` |
 | 閲覧権限（1） | `users` |
+
+**当初は22だった。** `race_payouts` を 2026-08-16 に、`progeny_notes` を同日に足している。
 
 中心は `entries`（出走）。1行が「ある馬がある1レースに出た分」にあたり、馬とレースを繋いでいる。
 
@@ -269,20 +273,41 @@ DB側に別名のテーブルは持たない。マスタは JRA の正式名称�
 
 ## 評価
 
-7テーブルとも同じ形。**対象 + 内容 + 書いた人 + 更新日。**
+8テーブルとも同じ形。**対象 + 内容 + 書いた人 + 更新日。**
 
 | テーブル | 対象（一意） | 例 |
 | --- | --- | --- |
 | `entry_notes` | `entry_id` | 向正面で強引にハナを取り返して消耗した。着順で能力をマイナス評価する必要はない |
 | `horse_notes` | `horse_id` | 阪神は問題ない。武豊と手が合う。今は充実期 |
-| `pedigree_notes` | `horse_id` | ゴールドシップ産駒なので2500もこなす |
+| `pedigree_notes` | `horse_id` | **その馬自身の血統。** 母系にウインドインハーヘアが入る |
+| `progeny_notes` | `horse_id` | **その馬の産駒の傾向。** 産駒は牡馬に出ると走るが牝馬は小さく出やすい |
 | `jockey_notes` | `jockey_id` | ペース作りがうまい |
 | `trainer_notes` | `trainer_id` | 叩き2走目で仕上げてくる |
 | `course_notes` | `course_id` | 東京芝2000は差し有利 |
 | `race_notes` | `race_id` | 前半が速く先行勢に厳しかった。**レース後の評価** |
 
 共通カラムは `id` / 対象のFK（一意）/ `body` (text) / `author` (text) / `created_at` / `updated_at`。
-`pedigree_notes` だけ `scope` を持つ。
+`pedigree_notes` と `progeny_notes` だけ `scope` を持つ。
+
+### 血統と産駒を分ける（2026-08-16 追加）
+
+**どちらも対象は `horses` の1行だが、指しているものが違う。**
+
+| | 何についての話か | 変わるか |
+| --- | --- | --- |
+| `pedigree_notes` | **その馬が、どういう血統の馬か。** 父母をたどった結果 | ほぼ変わらない |
+| `progeny_notes` | **その馬の子がどう走るか。** 種牡馬・繁殖牝馬としての傾向 | **世代が走るたびに変わる** |
+
+アドマイヤテラの血統を読むときは母アドマイヤミヤビの母系まで含めた総合の話になるが、
+「レイデオロ産駒はどうか」を知りたいときは**父の側から引く**。引きたい向きが違う。
+
+**同じ行に2つのカラムを持つ形にはしない。** `author` と `updated_at` が共有されるため。
+産駒側を更新した瞬間に血統評価まで「今日時点」になり、**「いつ時点の話か」を持つという前提が
+壊れる**。`author` も、血統は AI・産駒は対話のように分かれうる。
+
+`scope` の意味も違う。`pedigree_notes` は**何代遡ったか**、`progeny_notes` は**どの範囲の産駒を
+見たか**（何年産まで、中央の芝だけ、など）。産駒の傾向は出走機会の偏りを受けるので、どの範囲を
+見た話なのかが分からないと後から割り引けない。
 
 - **1つの対象につき1行。** 書き直しは上書きで、履歴のテーブルは作らない
 - `race_notes` は**レース後**の評価。予想時点の展開の見立ては `race_predictions`（別テーブル）
@@ -290,7 +315,7 @@ DB側に別名のテーブルは持たない。マスタは JRA の正式名称�
 - `pedigree_notes.scope` は「6代」「6代+全兄弟」のような自由記述。**5〜6世代を遡るのはマスト、
   兄弟系は任意**という基準は、スキーマではなく分析手順（skill）側に置く
 
-7テーブルに分けたまま作る。統合案を見送った経緯は
+対象ごとに分けたまま作る。統合案を見送った経緯は
 [decisions/0002-note-tables-per-target.md](decisions/0002-note-tables-per-target.md)。
 
 ### 評価が書かれるきっかけ
@@ -526,7 +551,7 @@ WIN5 は `leg_group` を「対象5レースの発走順で1〜5」として使�
 | 種類 | 対象 |
 | --- | --- |
 | RESTRICT | `races.course_id` / `entries` の全FK / `horses.sire_id` `dam_id` `trainer_id` / `*_predictions.mark_id` / `*_bets.race_id` / `*_bet_legs.entry_id` |
-| CASCADE | 評価7テーブルの対象FK / `*_predictions.entry_id` / `race_predictions.race_id` / `*_bet_legs` の bet へのFK |
+| CASCADE | 評価8テーブルの対象FK / `*_predictions.entry_id` / `race_predictions.race_id` / `*_bet_legs` の bet へのFK |
 
 **`entries.race_id` を CASCADE にしていないのが要点。** CASCADE にするとレースを1行消しただけで
 出走 → 出走ごとの評価 → 予想 → 買い目まで一気に消える。手で書いた評価が巻き添えで消えるのが
@@ -556,7 +581,7 @@ UPDATE 文に `updated_at = now()` を書き忘れると「いつ時点の話か
 | `horses` `jockeys` `trainers` | `name` | 登録時に「もう居るか」を名前で探す |
 | `ai_bets` `my_bets` | `race_id` | |
 
-評価7テーブルと予想の対象FKは UNIQUE 制約が索引を兼ねるので張らない。`entries.race_id` も
+評価8テーブルと予想の対象FKは UNIQUE 制約が索引を兼ねるので張らない。`entries.race_id` も
 `(race_id, horse_id)` の先頭列で引ける。
 
 ---
@@ -583,7 +608,7 @@ TypeScript から使う写しは [lib/enums/](../lib/enums/) にある。**正�
 | `sex` | 牡 / 牝 / セン | `horses` |
 | `affiliation` | 美浦 / 栗東 / 地方 / 外国 | `jockeys` `trainers` |
 | `status` | 出走 / 取消 / 除外 / 中止 / 失格 | `entries` |
-| `author` | AI / 人間 / 対話（`race_predictions` は AI / 対話 のみ） | 評価7テーブル、`race_predictions` |
+| `author` | AI / 人間 / 対話（`race_predictions` は AI / 対話 のみ） | 評価8テーブル、`race_predictions` |
 | `ticket_type` | 単勝 / 複勝 / 枠連 / 馬連 / 馬単 / ワイド / 3連複 / 3連単 / WIN5 | `ai_bets` `my_bets` |
 | `bet_style` | 単点 / ボックス / 流し / フォーメーション | `ai_bets` `my_bets` |
 | `access_level` | owner / friend / member / public | `users` |

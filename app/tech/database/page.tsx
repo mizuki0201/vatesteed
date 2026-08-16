@@ -94,6 +94,9 @@ const GROUPS: readonly Group[] = [
           "finish_time_ms",
           "last_3f_ms",
           "corner_positions",
+          "body_weight",
+          "body_weight_diff",
+          "margin",
         ],
         unique: "(race_id, horse_id) と (race_id, horse_number)",
       },
@@ -101,7 +104,7 @@ const GROUPS: readonly Group[] = [
   },
   {
     heading: "評価",
-    what: "解釈を入れる。7つとも形は同じで、対象が違うだけ。1対象1行の上書きで履歴は持たない",
+    what: "解釈を入れる。8つとも形は同じで、対象が違うだけ。1対象1行の上書きで履歴は持たない",
     tables: [
       {
         name: "entry_notes",
@@ -117,8 +120,14 @@ const GROUPS: readonly Group[] = [
       },
       {
         name: "pedigree_notes",
-        what: "血統から読める適性の素地",
+        what: "その馬自身の血統から読める適性の素地",
         columns: ["horse_id →horses", "body", "scope（何代まで見たか）", "author"],
+        unique: "horse_id",
+      },
+      {
+        name: "progeny_notes",
+        what: "その馬の産駒の傾向。種牡馬・繁殖牝馬としての話",
+        columns: ["horse_id →horses", "body", "scope（どの範囲の産駒を見たか）", "author"],
         unique: "horse_id",
       },
       {
@@ -210,6 +219,24 @@ const GROUPS: readonly Group[] = [
         name: "my_bet_legs",
         what: "その列",
         columns: ["ai_bet_legs と同じ形"],
+      },
+    ],
+  },
+  {
+    heading: "確定払戻",
+    what: "レースの公式な払戻。自分の買い目がいくら戻ったか（ai_bets.payout）とは別のもの",
+    tables: [
+      {
+        name: "race_payouts",
+        what: "そのレースの払戻。100円あたりの金額",
+        columns: [
+          "race_id →races",
+          "ticket_type",
+          "combination（当たった組み合わせ）",
+          "amount",
+          "popularity",
+        ],
+        unique: "(race_id, ticket_type, combination)",
       },
     ],
   },

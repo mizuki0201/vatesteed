@@ -88,7 +88,7 @@ export type EntryStatus = (typeof ENTRY_STATUSES)[number];
 // 評価・予想の書き手
 // ---------------------------------------------------------------------------
 
-/** 評価7テーブル（`entry_notes` など）の `author`。 */
+/** 評価8テーブル（`entry_notes` など）の `author`。 */
 export const NOTE_AUTHORS = ["AI", "人間", "対話"] as const;
 export type NoteAuthor = (typeof NOTE_AUTHORS)[number];
 

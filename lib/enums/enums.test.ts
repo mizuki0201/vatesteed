@@ -71,11 +71,12 @@ function parseCheckedValues(sql: string): Map<string, string[]> {
   return found;
 }
 
-/** 評価7テーブル。どれも `author` の縛りは同じ。 */
+/** 評価8テーブル。どれも `author` の縛りは同じ。 */
 const NOTE_TABLES = [
   "entry_notes",
   "horse_notes",
   "pedigree_notes",
+  "progeny_notes",
   "jockey_notes",
   "trainer_notes",
   "course_notes",

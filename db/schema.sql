@@ -9,6 +9,7 @@
 --   0003_races_race_number_nullable.sql
 --   0004_entries_body_weight.sql
 --   0005_race_payouts_and_margin.sql
+--   0006_progeny_notes.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -282,6 +283,19 @@ CREATE TABLE pedigree_notes (
   CONSTRAINT pedigree_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
 );
 
+CREATE TABLE progeny_notes (
+  id         bigserial                NOT NULL,
+  horse_id   bigint                   NOT NULL,
+  body       text                     NOT NULL,
+  scope      text,
+  author     text                     NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT progeny_notes_pkey PRIMARY KEY (id),
+  CONSTRAINT progeny_notes_horse_id_key UNIQUE (horse_id),
+  CONSTRAINT progeny_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+);
+
 CREATE TABLE race_notes (
   id         bigserial                NOT NULL,
   race_id    bigint                   NOT NULL,
@@ -410,6 +424,7 @@ ALTER TABLE my_bets ADD CONSTRAINT my_bets_race_id_fkey FOREIGN KEY (race_id) RE
 ALTER TABLE my_predictions ADD CONSTRAINT my_predictions_entry_id_fkey FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE;
 ALTER TABLE my_predictions ADD CONSTRAINT my_predictions_mark_id_fkey FOREIGN KEY (mark_id) REFERENCES marks(id) ON DELETE RESTRICT;
 ALTER TABLE pedigree_notes ADD CONSTRAINT pedigree_notes_horse_id_fkey FOREIGN KEY (horse_id) REFERENCES horses(id) ON DELETE CASCADE;
+ALTER TABLE progeny_notes ADD CONSTRAINT progeny_notes_horse_id_fkey FOREIGN KEY (horse_id) REFERENCES horses(id) ON DELETE CASCADE;
 ALTER TABLE race_notes ADD CONSTRAINT race_notes_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE;
 ALTER TABLE race_payouts ADD CONSTRAINT race_payouts_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE;
 ALTER TABLE race_predictions ADD CONSTRAINT race_predictions_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE CASCADE;
@@ -453,6 +468,7 @@ CREATE TRIGGER marks_set_updated_at BEFORE UPDATE ON public.marks FOR EACH ROW E
 CREATE TRIGGER my_bets_set_updated_at BEFORE UPDATE ON public.my_bets FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER my_predictions_set_updated_at BEFORE UPDATE ON public.my_predictions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER pedigree_notes_set_updated_at BEFORE UPDATE ON public.pedigree_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER progeny_notes_set_updated_at BEFORE UPDATE ON public.progeny_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER race_notes_set_updated_at BEFORE UPDATE ON public.race_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER race_payouts_set_updated_at BEFORE UPDATE ON public.race_payouts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER race_predictions_set_updated_at BEFORE UPDATE ON public.race_predictions FOR EACH ROW EXECUTE FUNCTION set_updated_at();

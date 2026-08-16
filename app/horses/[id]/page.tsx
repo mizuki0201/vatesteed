@@ -53,9 +53,15 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
         {horse.pedigreeNote ? (
           <Card>
             {horse.pedigreeNote.scope ? (
-              <p className="mb-2 font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
-                見た範囲: {horse.pedigreeNote.scope}
-              </p>
+              <details className="mb-3 group">
+                <summary className="cursor-pointer font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase list-none marker:content-none hover:text-foreground">
+                  見た範囲 <span className="group-open:hidden">▸</span>
+                  <span className="hidden group-open:inline">▾</span>
+                </summary>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  {horse.pedigreeNote.scope}
+                </p>
+              </details>
             ) : null}
             <NoteBody author={horse.pedigreeNote.author} body={horse.pedigreeNote.body} />
           </Card>

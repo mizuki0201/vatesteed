@@ -1,5 +1,21 @@
 {
+  "permissions": {
+    "allow": ["Bash(pnpm db:query:*)"]
+  },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/guard-db-delete.sh",
+            "statusMessage": "DELETE が混ざっていないか見ています",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",

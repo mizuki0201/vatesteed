@@ -10,6 +10,8 @@
 --   0004_entries_body_weight.sql
 --   0005_race_payouts_and_margin.sql
 --   0006_progeny_notes.sql
+--   0007_races_entry_list_complete.sql
+--   0008_horses_retired_at.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -177,6 +179,7 @@ CREATE TABLE horses (
   trainer_id bigint,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  retired_at date,
   CONSTRAINT horses_pkey PRIMARY KEY (id),
   CONSTRAINT horses_sex_check CHECK ((sex = ANY (ARRAY['牡'::text, '牝'::text, 'セン'::text])))
 );
@@ -338,20 +341,21 @@ CREATE TABLE race_predictions (
 );
 
 CREATE TABLE races (
-  id               bigserial                NOT NULL,
-  race_date        date                     NOT NULL,
-  course_id        bigint                   NOT NULL,
-  meeting_number   integer,
-  meeting_day      integer,
-  race_number      integer,
-  race_name        text,
-  grade            text,
-  weight_rule      text,
-  weather_forecast text,
-  track_condition  text,
-  weather          text,
-  created_at       timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at       timestamp with time zone NOT NULL DEFAULT now(),
+  id                  bigserial                NOT NULL,
+  race_date           date                     NOT NULL,
+  course_id           bigint                   NOT NULL,
+  meeting_number      integer,
+  meeting_day         integer,
+  race_number         integer,
+  race_name           text,
+  grade               text,
+  weight_rule         text,
+  weather_forecast    text,
+  track_condition     text,
+  weather             text,
+  created_at          timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at          timestamp with time zone NOT NULL DEFAULT now(),
+  entry_list_complete boolean                  NOT NULL DEFAULT false,
   CONSTRAINT races_pkey PRIMARY KEY (id),
   CONSTRAINT races_natural_key UNIQUE (race_date, course_id, race_number),
   CONSTRAINT races_grade_check CHECK ((grade = ANY (ARRAY['G1'::text, 'G2'::text, 'G3'::text, 'J.G1'::text, 'J.G2'::text, 'J.G3'::text, 'Jpn1'::text, 'Jpn2'::text, 'Jpn3'::text, 'OP'::text, 'L'::text, '3勝'::text, '2勝'::text, '1勝'::text, '新馬'::text, '未勝利'::text]))),

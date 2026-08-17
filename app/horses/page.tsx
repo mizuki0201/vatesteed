@@ -1,27 +1,33 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Card, Empty, PageShell } from "@/components/screens/page-shell";
-import { SearchForm } from "@/components/screens/search-form";
-import { listHorses } from "@/lib/horses";
+import { HorseSearchForm } from "@/components/screens/horse-search-form";
+import { listHorses, type HorseStatus } from "@/lib/horses";
 
 export const metadata: Metadata = { title: "馬 — Vatesteed" };
 
 export default async function Page({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly q?: string }>;
+  readonly searchParams: Promise<{ readonly q?: string; readonly status?: string }>;
 }) {
-  const { q } = await searchParams;
-  const horses = await listHorses({ q });
+  const { q, status: rawStatus } = await searchParams;
+  const status: HorseStatus = rawStatus === "retired" ? "retired" : "active";
+  const horses = await listHorses({ q, status });
 
   return (
     <PageShell
-      actions={<SearchForm action="/horses" defaultValue={q} placeholder="馬名" />}
-      lead={`${horses.length} 頭。対話した馬の分だけ溜まります。`}
+      actions={<HorseSearchForm q={q} status={status} />}
+      lead="引退は確認できた時点で反映します。引退直後の馬は、現役として表示されることがあります。"
       title="馬"
     >
+      <p className="mb-4 text-sm text-muted-foreground">全 {horses.length} 頭</p>
       {horses.length === 0 ? (
-        <Empty>{q ? `「${q}」に当たる馬はいません。` : "まだ馬が登録されていません。"}</Empty>
+        <Empty>
+          {q
+            ? `「${q}」に当たる馬はいません。`
+            : `${status === "active" ? "現役馬" : "引退馬"}はまだ登録されていません。`}
+        </Empty>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
           {horses.map((horse) => (

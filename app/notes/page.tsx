@@ -5,10 +5,10 @@ import { NoteBody } from "@/components/screens/note-body";
 import { SearchForm } from "@/components/screens/search-form";
 import { countNotesByKind, listNotes, NOTE_KINDS, NOTE_KIND_LABEL, type NoteKind } from "@/lib/notes";
 
-export const metadata: Metadata = { title: "書きためた読み — Vatesteed" };
+export const metadata: Metadata = { title: "最新の分析結果 — Vatesteed" };
 
 /**
- * 書きためた読みを、対象をまたいで1つの並びで見る画面。
+ * 分析結果を、対象をまたいで1つの並びで見る画面。
  *
  * **更新の新しい順**にしてあるのは、「昔の見立てが今も通用するか」を見つけるため。
  */
@@ -31,7 +31,7 @@ export default async function Page({
     <PageShell
       actions={<SearchForm action="/notes" defaultValue={q} placeholder="対象名・本文" />}
       lead={`${total} 件。新しく書いたものから並べています。`}
-      title="書きためた読み"
+      title="最新の分析結果"
     >
       <div className="mb-6 flex flex-wrap gap-2 text-sm">
         <FilterLink count={total} current={selected} kind={undefined} q={q} />

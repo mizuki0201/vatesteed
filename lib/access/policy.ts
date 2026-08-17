@@ -30,17 +30,17 @@ export const REQUIRED_LEVEL = {
   about: "public",
   /** 技術情報（構成・DB 設計）。 */
   tech: "public",
-  /** レースの一覧と1枚。印・予想・評価を含む。 */
+  /** レースの一覧と詳細。印・予想・評価を含む。 */
   races: "member",
   /** AI の成績と回収率。 */
   "results.ai": "member",
-  /** 馬の一覧と1枚。 */
+  /** 馬の一覧と詳細。 */
   horses: "friend",
-  /** 騎手の一覧と1枚。 */
+  /** 騎手の一覧と詳細。 */
   jockeys: "friend",
-  /** 厩舎の一覧と1枚。 */
+  /** 厩舎の一覧と詳細。 */
   trainers: "friend",
-  /** コースの一覧と1枚。 */
+  /** コースの一覧と詳細。 */
   courses: "friend",
   /** 自分の成績と収支。 */
   "results.mine": "friend",

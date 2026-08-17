@@ -24,14 +24,14 @@ export function ResultsView({
       <Section title="合計">
         <div className="grid gap-3 sm:grid-cols-4">
           <Stat label="回収率" value={formatRate(total.recoveryRate)} />
-          <Stat label="使った額" value={`${total.totalAmount.toLocaleString()}円`} />
-          <Stat label="戻った額" value={`${total.returnedAmount.toLocaleString()}円`} />
-          <Stat label="レース" value={`${total.raceCount}`} />
+          <Stat label="購入金額" value={`${total.totalAmount.toLocaleString()}円`} />
+          <Stat label="払戻金" value={`${total.returnedAmount.toLocaleString()}円`} />
+          <Stat label="予想レース数" value={`${total.raceCount}`} />
         </div>
         {total.pendingCount > 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">
             結果がまだ入っていない買い目が {total.pendingCount} 件あります。
-            <span className="text-foreground">その分は「戻った額」に入っていません</span>
+            <span className="text-foreground">その分は「払戻金」に入っていません</span>
             ので、回収率は確定値ではありません。
           </p>
         ) : null}

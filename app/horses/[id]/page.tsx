@@ -22,6 +22,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
         <>
           {horse.sex ?? ""}
           {horse.birthYear ? ` · ${horse.birthYear}年生` : ""}
+          {horse.retiredAt ? ` · 引退（${horse.retiredAt}）` : " · 現役扱い"}
           {horse.trainerId ? (
             <>
               {" · "}
@@ -33,6 +34,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
           {horse.sireName || horse.damName
             ? ` · 父 ${horse.sireName ?? "不明"} / 母 ${horse.damName ?? "不明"}`
             : ""}
+          <span className="mt-1 block">引退は確認できた時点で反映します。引退直後の馬は、現役扱いのことがあります。</span>
         </>
       }
       title={horse.name}
@@ -44,7 +46,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
           </Card>
         ) : (
           <Empty>
-            まだ書いていません。レースごとの読みが溜まってから、人と話しながら決めます。
+            まだ書いていません。レースごとの分析が溜まってから、人と話しながら決めます。
           </Empty>
         )}
       </Section>

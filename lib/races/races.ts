@@ -110,11 +110,12 @@ export async function listRaces(options: { readonly q?: string } = {}): Promise<
             (SELECT count(*) FROM entries e WHERE e.race_id = r.id) AS entry_count,
             EXISTS (SELECT 1 FROM race_predictions p WHERE p.race_id = r.id) AS has_prediction,
             EXISTS (SELECT 1 FROM entries e WHERE e.race_id = r.id AND e.finish_position IS NOT NULL) AS has_result
-       FROM races r
-       JOIN courses c ON c.id = r.course_id
-      WHERE $1::text IS NULL
+      FROM races r
+      JOIN courses c ON c.id = r.course_id
+      WHERE r.entry_list_complete
+        AND ($1::text IS NULL
          OR r.race_name ILIKE '%' || $1 || '%'
-         OR c.track ILIKE '%' || $1 || '%'
+         OR c.track ILIKE '%' || $1 || '%')
       ORDER BY r.race_date DESC, r.race_number NULLS LAST
       LIMIT 200`,
     [q || null],

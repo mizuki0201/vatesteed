@@ -11,6 +11,7 @@ export type HorseSummary = {
   readonly trainerName: string | null;
   readonly entryCount: string;
   readonly hasNote: boolean;
+  readonly retiredAt: string | null;
 };
 
 export type HorseDetail = {
@@ -21,6 +22,7 @@ export type HorseDetail = {
   readonly birthYear: number | null;
   readonly trainerId: string | null;
   readonly trainerName: string | null;
+  readonly retiredAt: string | null;
   readonly sireName: string | null;
   readonly damName: string | null;
   readonly note: { readonly body: string; readonly author: string } | null;
@@ -49,24 +51,28 @@ export type HorseEntry = {
   readonly noteAuthor: string | null;
 };
 
-/** 一覧。`q` を渡すと馬名の部分一致で絞る。 */
-export async function listHorses(options: { readonly q?: string } = {}): Promise<
+export type HorseStatus = "active" | "retired";
+
+/** 一覧。`q` を渡すと馬名の部分一致で絞る。現役を既定にする。 */
+export async function listHorses(options: { readonly q?: string; readonly status?: HorseStatus } = {}): Promise<
   readonly HorseSummary[]
 > {
   await assertCan("horses");
 
   const q = options.q?.trim();
+  const status = options.status ?? "active";
 
   const { rows } = await query(
-    `SELECT h.id, h.name, h.sex, h.birth_year, t.name AS trainer_name,
+    `SELECT h.id, h.name, h.sex, h.birth_year, h.retired_at, t.name AS trainer_name,
             (SELECT count(*) FROM entries e WHERE e.horse_id = h.id) AS entry_count,
             EXISTS (SELECT 1 FROM horse_notes n WHERE n.horse_id = h.id) AS has_note
        FROM horses h
        LEFT JOIN trainers t ON t.id = h.trainer_id
-      WHERE $1::text IS NULL OR h.name ILIKE '%' || $1 || '%'
+      WHERE ($1::text IS NULL OR h.name ILIKE '%' || $1 || '%')
+        AND (CASE WHEN $2 = 'retired' THEN h.retired_at IS NOT NULL ELSE h.retired_at IS NULL END)
       ORDER BY h.name
       LIMIT 200`,
-    [q || null],
+    [q || null, status],
   );
 
   return rows.map((row) => ({
@@ -77,6 +83,7 @@ export async function listHorses(options: { readonly q?: string } = {}): Promise
     trainerName: (row.trainer_name as string | null) ?? null,
     entryCount: String(row.entry_count),
     hasNote: Boolean(row.has_note),
+    retiredAt: (row.retired_at as string | null) ?? null,
   }));
 }
 
@@ -84,7 +91,7 @@ export async function getHorse(id: string): Promise<HorseDetail | undefined> {
   await assertCan("horses");
 
   const { rows } = await query(
-    `SELECT h.id, h.name, h.name_kana, h.sex, h.birth_year,
+    `SELECT h.id, h.name, h.name_kana, h.sex, h.birth_year, h.retired_at,
             t.id AS trainer_id, t.name AS trainer_name,
             sire.name AS sire_name, dam.name AS dam_name,
             n.body AS note_body, n.author AS note_author,
@@ -110,6 +117,7 @@ export async function getHorse(id: string): Promise<HorseDetail | undefined> {
     birthYear: (row.birth_year as number | null) ?? null,
     trainerId: row.trainer_id === null ? null : String(row.trainer_id),
     trainerName: (row.trainer_name as string | null) ?? null,
+    retiredAt: (row.retired_at as string | null) ?? null,
     sireName: (row.sire_name as string | null) ?? null,
     damName: (row.dam_name as string | null) ?? null,
     note: row.note_body ? { body: String(row.note_body), author: String(row.note_author) } : null,

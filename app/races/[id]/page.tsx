@@ -20,7 +20,7 @@ import {
 export const metadata: Metadata = { title: "レース — Vatesteed" };
 
 /**
- * レース1枚。
+ * レースの詳細。
  *
  * **出馬表と着順を先に出す。** 見に来た人がまず知りたいのは「誰が出て、どう決まったか」で、
  * AI が何を考えたかはその次。予想の中身だけを並べると、競馬を見に来た人には読みにくい。
@@ -83,7 +83,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
         )}
       </Section>
 
-      <Section note="レース前に、隊列がどう動くかを読んだもの" title="展開の読み">
+      <Section note="レース前に、隊列がどう動くかを分析したもの" title="展開の分析">
         {race.prediction ? (
           <Card>
             <NoteBody author={race.prediction.author} body={race.prediction.body} />
@@ -103,7 +103,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
         )}
       </Section>
 
-      <Section note="印の順。無印は後ろ" title="1頭ずつの読み">
+      <Section note="印の順。無印は後ろ" title="1頭ずつの分析">
         {entries.length === 0 ? (
           <Empty>出走する馬がまだ登録されていません。</Empty>
         ) : (
@@ -359,7 +359,7 @@ function PayoutTable({ payouts }: { readonly payouts: readonly RacePayout[] }) {
   );
 }
 
-/** 1頭ずつの読み。長い本文は畳んでおく。 */
+/** 1頭ずつの分析。長い本文は畳んでおく。 */
 function EntryCard({ entry }: { readonly entry: RaceEntry }) {
   return (
     <Card>

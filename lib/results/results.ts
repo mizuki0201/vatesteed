@@ -1,6 +1,7 @@
 import { query } from "../db/index.ts";
 import { assertCan } from "../access/index.ts";
 import { recoveryRate } from "../bets/index.ts";
+import { resultsPeriod, type ResultsPeriod } from "./period.ts";
 
 /**
  * 成績と回収率。
@@ -36,6 +37,8 @@ export type ResultsRace = {
   readonly settled: boolean;
 };
 
+export type { ResultsPeriod } from "./period.ts";
+
 function tableOf(owner: ResultsOwner): string {
   return owner === "ai" ? "ai_bets" : "my_bets";
 }
@@ -45,8 +48,13 @@ async function guard(owner: ResultsOwner): Promise<void> {
 }
 
 /** 全体の合計。 */
-export async function getResultsTotal(owner: ResultsOwner): Promise<ResultsTotal> {
+export async function getResultsTotal(
+  owner: ResultsOwner,
+  period: ResultsPeriod = {},
+): Promise<ResultsTotal> {
   await guard(owner);
+
+  const filter = periodFilter(period);
 
   const { rows } = await query(
     `SELECT count(*) AS bet_count,
@@ -54,7 +62,9 @@ export async function getResultsTotal(owner: ResultsOwner): Promise<ResultsTotal
             count(*) FILTER (WHERE payout IS NULL AND refund IS NULL) AS pending_count,
             coalesce(sum(total_amount), 0) AS total_amount,
             coalesce(sum(coalesce(payout, 0) + coalesce(refund, 0)), 0) AS returned_amount
-       FROM ${tableOf(owner)}`,
+       FROM ${tableOf(owner)} b
+      ${filter.sql}`,
+    filter.params,
   );
 
   const row = rows[0] ?? {};
@@ -75,8 +85,13 @@ export async function getResultsTotal(owner: ResultsOwner): Promise<ResultsTotal
 }
 
 /** レースごとの内訳。新しい順。 */
-export async function listResultsByRace(owner: ResultsOwner): Promise<readonly ResultsRace[]> {
+export async function listResultsByRace(
+  owner: ResultsOwner,
+  period: ResultsPeriod = {},
+): Promise<readonly ResultsRace[]> {
   await guard(owner);
+
+  const filter = periodFilter(period);
 
   const { rows } = await query(
     `SELECT b.race_id, r.race_date, r.race_name,
@@ -86,8 +101,10 @@ export async function listResultsByRace(owner: ResultsOwner): Promise<readonly R
             bool_and(b.payout IS NOT NULL OR b.refund IS NOT NULL) AS settled
        FROM ${tableOf(owner)} b
        LEFT JOIN races r ON r.id = b.race_id
+      ${filter.sql}
       GROUP BY b.race_id, r.race_date, r.race_name
       ORDER BY r.race_date DESC NULLS LAST`,
+    filter.params,
   );
 
   return rows.map((row) => {
@@ -108,4 +125,24 @@ export async function listResultsByRace(owner: ResultsOwner): Promise<readonly R
       settled: Boolean(row.settled),
     };
   });
+}
+
+function periodFilter(period: ResultsPeriod): { readonly sql: string; readonly params: readonly string[] } {
+  const normalized = resultsPeriod(period);
+  const conditions: string[] = [];
+  const params: string[] = [];
+
+  if (normalized.from) {
+    params.push(normalized.from);
+    conditions.push(`b.created_at >= $${params.length}::date`);
+  }
+  if (normalized.to) {
+    params.push(normalized.to);
+    conditions.push(`b.created_at < ($${params.length}::date + interval '1 day')`);
+  }
+
+  return {
+    sql: conditions.length === 0 ? "" : `WHERE ${conditions.join(" AND ")}`,
+    params,
+  };
 }

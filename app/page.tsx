@@ -6,7 +6,7 @@ import { getViewer } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Vatesteed",
-  description: "競馬について AI と人間が分担して考えるためのエージェント。その蓄積を読む画面。",
+  description: "競馬を予想する上でAIと人間のいいとこどりを実現したいAIエージェントです。",
 };
 
 /**
@@ -29,13 +29,13 @@ const GROUPS: readonly { readonly heading: string; readonly entries: readonly En
       {
         href: "/races",
         title: "レース",
-        body: "出馬表・着順・払戻と、AI が読んだ内容を1枚で見る",
+        body: "出馬表・着順・払戻と、AI が分析した内容の詳細を見る",
         capability: "races",
       },
       {
         href: "/results/ai",
         title: "AI の成績",
-        body: "買ったつもりの馬券の回収率。レースごとの内訳つき",
+        body: "AI の馬券成績。レースごとの内訳つき",
         capability: "results.ai",
       },
       {
@@ -47,16 +47,16 @@ const GROUPS: readonly { readonly heading: string; readonly entries: readonly En
     ],
   },
   {
-    heading: "蓄積",
+    heading: "各種データ",
     entries: [
-      { href: "/horses", title: "馬", body: "どういう馬かの見立てと、レースごとの読み", capability: "horses" },
+      { href: "/horses", title: "馬", body: "どういう馬かの見立てと、レースごとの分析", capability: "horses" },
       { href: "/jockeys", title: "騎手", body: "乗り方の癖と騎乗の履歴", capability: "jockeys" },
       { href: "/trainers", title: "厩舎", body: "仕上げ方とローテーション", capability: "trainers" },
       { href: "/courses", title: "コース", body: "コースごとの傾向", capability: "courses" },
       {
         href: "/notes",
-        title: "書きためた読み",
-        body: "馬・騎手・厩舎・コースの見立てを、新しい順に並べる",
+        title: "最新の分析結果",
+        body: "馬・騎手・厩舎・コースの分析結果を、新しい順に並べる",
         capability: "notes.raw",
       },
     ],
@@ -67,19 +67,19 @@ const GROUPS: readonly { readonly heading: string; readonly entries: readonly En
       {
         href: "/tech",
         title: "技術情報",
-        body: "構成と DB 設計。静的なページ",
+        body: "構成と DB 設計",
         capability: "tech",
       },
       {
         href: "/about",
-        title: "これは何か",
+        title: "Vatesteedについて",
         body: "Vatesteed が何を目指しているか",
         capability: "about",
       },
       {
         href: "/dashboard",
-        title: "裏側",
-        body: "誰にどこを見せているかの一覧",
+        title: "ダッシュボード",
+        body: "管理者専用のダッシュボード",
         capability: "dashboard",
       },
     ],
@@ -91,28 +91,7 @@ export default async function Page() {
 
   return (
     <PageShell
-      lead={
-        <>
-          競馬について AI と人間が分担して考えるためのエージェントです。ここは
-          <span className="text-foreground">溜まったものを読むための画面</span>
-          で、書き込みはできません。
-          {viewer === "public" ? (
-            <>
-              {" "}
-              いまは <span className="font-mono uppercase">public</span> として見ています。
-              <Link className="underline hover:no-underline" href="/login">
-                ログイン
-              </Link>
-              すると見えるものが増えます。
-            </>
-          ) : (
-            <>
-              {" "}
-              いまは <span className="font-mono uppercase">{viewer}</span> として見ています。
-            </>
-          )}
-        </>
-      }
+      lead="競馬を予想する上でAIと人間のいいとこどりを実現したいAIエージェントです。"
       title="🐎 Vatesteed"
     >
       {GROUPS.map((group) => (

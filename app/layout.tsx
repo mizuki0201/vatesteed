@@ -22,7 +22,7 @@ const mono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Vatesteed",
   description:
-    "膨大なデータを集めて解析する AI と、データに表れない文脈を読む人間。ふたりで競馬の予想を組み立てるエージェントです。",
+    "競馬を予想する上でAIと人間のいいとこどりを実現したいAIエージェントです。",
 };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {

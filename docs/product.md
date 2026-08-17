@@ -350,15 +350,15 @@ publishing.md に書いてから、スキルをそこから書き起こす。
 | `/tech` | 技術情報のまとめ。構成と各技術画面へのリンク | public |
 | `/tech/database` | DB 設計。24テーブルの図と説明 | public |
 | `/races` | レースの一覧（検索できる） | member |
-| `/races/[id]` | **レース1枚。** 出走表・印・評価・展開の予想・買い目 | member |
-| `/results/ai` | AI の成績と回収率 | member |
-| `/horses` `/horses/[id]` | 馬の一覧と1枚（評価と出走の履歴） | friend |
-| `/jockeys` `/jockeys/[id]` | 騎手の一覧と1枚 | friend |
-| `/trainers` `/trainers/[id]` | 厩舎の一覧と1枚 | friend |
-| `/courses` `/courses/[id]` | コースの一覧と1枚 | friend |
-| `/results/mine` | 自分の成績と収支 | friend |
-| `/notes` | 蓄積の横断一覧。7種類の評価を更新日順に | owner |
-| `/dashboard` | 裏側。誰にどこを見せているかの一覧 | owner |
+| `/races/[id]` | **レースの詳細。** 出走表・印・評価・展開の予想・買い目 | member |
+| `/results/ai` | AI の成績と回収率。購入日で期間を絞り込める | member |
+| `/horses` `/horses/[id]` | 馬の一覧と詳細（評価と出走の履歴）。現役・引退で絞り込める | friend |
+| `/jockeys` `/jockeys/[id]` | 騎手の一覧と詳細 | friend |
+| `/trainers` `/trainers/[id]` | 厩舎の一覧と詳細 | friend |
+| `/courses` `/courses/[id]` | コースの一覧と詳細 | friend |
+| `/results/mine` | 自分の成績と収支。購入日で期間を絞り込める | friend |
+| `/notes` | 最新の分析結果。7種類の評価を更新日順に | owner |
+| `/dashboard` | ダッシュボード。誰にどこを見せているかの一覧 | owner |
 
 **レベルは動かす前提。** 馬・騎手・厩舎・コースを friend にしてあるのは今の判断で、
 後から member へ降ろす可能性がある。

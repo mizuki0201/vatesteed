@@ -51,7 +51,7 @@ export type HorseEntry = {
   readonly noteAuthor: string | null;
 };
 
-export type HorseStatus = "active" | "retired";
+export type HorseStatus = "all" | "active" | "retired";
 
 /** 一覧。`q` を渡すと馬名の部分一致で絞る。現役を既定にする。 */
 export async function listHorses(options: { readonly q?: string; readonly status?: HorseStatus } = {}): Promise<
@@ -69,7 +69,7 @@ export async function listHorses(options: { readonly q?: string; readonly status
        FROM horses h
        LEFT JOIN trainers t ON t.id = h.trainer_id
       WHERE ($1::text IS NULL OR h.name ILIKE '%' || $1 || '%')
-        AND (CASE WHEN $2 = 'retired' THEN h.retired_at IS NOT NULL ELSE h.retired_at IS NULL END)
+        AND ($2 = 'all' OR CASE WHEN $2 = 'retired' THEN h.retired_at IS NOT NULL ELSE h.retired_at IS NULL END)
       ORDER BY h.name
       LIMIT 200`,
     [q || null, status],

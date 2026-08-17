@@ -352,7 +352,7 @@ publishing.md に書いてから、スキルをそこから書き起こす。
 | `/races` | レースの一覧（検索できる） | member |
 | `/races/[id]` | **レースの詳細。** 出走表・印・評価・展開の予想・買い目 | member |
 | `/results/ai` | AI の成績と回収率。購入日で期間を絞り込める | member |
-| `/horses` `/horses/[id]` | 馬の一覧と詳細（評価と出走の履歴）。現役・引退で絞り込める | friend |
+| `/horses` `/horses/[id]` | 馬の一覧と詳細（評価と出走の履歴）。すべて・現役・引退をセグメントコントロールで切り替えられる | friend |
 | `/jockeys` `/jockeys/[id]` | 騎手の一覧と詳細 | friend |
 | `/trainers` `/trainers/[id]` | 厩舎の一覧と詳細 | friend |
 | `/courses` `/courses/[id]` | コースの一覧と詳細 | friend |

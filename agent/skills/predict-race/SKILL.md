@@ -29,7 +29,7 @@ description: 展開を読み、着順を予想し、印をつける。register-r
 ここまで出すと「誰が前にいるか」ではなく**「どの地点で誰と誰が並ぶか」**まで踏み込める。
 不利の受けやすさ、動くタイミング、包まれるリスクが具体的になる。
 
-あわせて書くもの: 想定ペース（前半の通過タイム）、有利になる脚質、馬場と天気の前提。
+あわせて書くもの: 想定ペース（前半の通過タイム）、有利になる脚質。
 
 書き込む先は `race_predictions`。`author` は `AI`、人間と詰めたなら `対話`。
 
@@ -43,6 +43,30 @@ RETURNING id;
 
 **`rowCount` が 0 で返ったら、その行は人間か対話が書いたもの。**書き直さず、前の見方・
 新しい見方・何がどう変わるのかを添えて人間に確認する。
+
+### 馬場と天候の前提は展開に混ぜない
+
+**展開の見立てと、その見立てが何に乗っていたかは別のもの。** 前提は
+`race_prediction_conditions` に分けて置く（→
+[docs/agent-design.md](../../../docs/agent-design.md#予想時点の前提とレース後の実績を混ぜない)）。
+
+```sql
+INSERT INTO race_prediction_conditions (race_id, predicted_at, track_division, body, author)
+VALUES ($1, now(), $2, $3, 'AI')
+ON CONFLICT (race_id) DO UPDATE
+  SET predicted_at = now(), track_division = EXCLUDED.track_division, body = EXCLUDED.body, author = 'AI'
+WHERE race_prediction_conditions.author = 'AI'
+RETURNING id;
+```
+
+- 入れるのは**予想を出す時点で分かっていたことだけ。** コース区分、開催がどこまで進んでいるか、
+  予報、馬場の見込み、公表済みの数値
+- **取れなかったものは「取れなかった」と `body` に書く。** 空けたままにすると、調べていないのか
+  調べて無かったのかが分からない。**推測値で埋めない**
+- **開催回と日目は `races` にあるので書き直さない。** そこから読めないこと（開催が進んで内が
+  荒れてきた、など）を書く
+- **レース後にここへ手を入れない。** 実際の馬場と天気は `races.track_condition` `races.weather`
+  に入る。**当日の情報で公開済みの予想を書き直さない**
 
 ## 2. 印をつける
 
@@ -68,3 +92,5 @@ RETURNING id;
 - **各馬を読まずに展開から入らない。** 順序を逆にしない
 - **人気を根拠に印を決めない。** 人気は結果であって能力ではない
 - **裏の取れていない数値を判断の柱にしない**（[register-race](../register-race/SKILL.md) の裏取り）
+- **出した予想を、当日の馬場を見てから書き直さない。** 予想は枠順確定直後の時点で固定する。
+  当日の話は対話として扱う（[docs/product.md](../../../docs/product.md#2-レースを予想する1の特殊な形)）

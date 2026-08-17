@@ -51,6 +51,10 @@
 - **レース当日の情報は、予想する時点で分かっているものだけ持つ。** 予想は枠順確定直後に行うため、
   枠順・出走メンバー・天気予報は持ち、当日馬体重とパドックは持たない
 - 実際の馬場状態・天気・着順・レース内容は、**レース後の評価を書くために必要**なので保存する
+- **予想時点の前提と、レース後に確定した実績は、置き場で分ける。** 前提は
+  [`race_prediction_conditions`](#race_prediction_conditions)、実績は `races` の列と
+  [`race_laps`](#race_laps)。**同じ列を上書きする形にすると、公開した予想を後から書き換えたのと
+  区別が付かなくなる**
 
 蓄積型 / 都度取得型の区別そのものは [architecture.md](architecture.md#ナレッジの性質) を参照。
 
@@ -62,20 +66,20 @@
 [compliance.md](compliance.md) の方針で自動収集にあたるため、**確実に取得できる経路が無い**。
 後から必要になったらカラムを1本足すだけで済む。
 
-### テーブル一覧（25）
+### テーブル一覧（27）
 
 | 分類 | テーブル |
 | --- | --- |
-| 土台（6） | `courses` `races` `horses` `jockeys` `trainers` `entries` |
+| 土台（7） | `courses` `races` `horses` `jockeys` `trainers` `entries` `race_laps` |
 | 評価（8） | `entry_notes` `horse_notes` `pedigree_notes` `progeny_notes` `jockey_notes` `trainer_notes` `course_notes` `race_notes` |
 | コメント（1） | `entry_comments` |
-| 予想（4） | `marks` `ai_predictions` `my_predictions` `race_predictions` |
+| 予想（5） | `marks` `ai_predictions` `my_predictions` `race_predictions` `race_prediction_conditions` |
 | 購入（4） | `ai_bets` `ai_bet_legs` `my_bets` `my_bet_legs` |
 | 確定払戻（1） | `race_payouts` |
 | 閲覧権限（1） | `users` |
 
 **当初は22だった。** `race_payouts` を 2026-08-16 に、`progeny_notes` を同日に、
-`entry_comments` を 2026-08-17 に足している。
+`entry_comments` `race_laps` `race_prediction_conditions` を 2026-08-17 に足している。
 
 中心は `entries`（出走）。1行が「ある馬がある1レースに出た分」にあたり、馬とレースを繋いでいる。
 
@@ -251,6 +255,31 @@ md マスタで正式名称に直してからSQLを投げる（下記「レー�
   枠順確定後に登録するので必ず埋まるが、**過去の出走は情報源によっては馬番が取れない**。
   `UNIQUE (race_id, horse_number)` はそのまま残してあり、Postgres は既定で null を互いに
   異なる値として扱うので、馬番の分からない出走が同じレースに複数あっても弾かれない
+
+### `race_laps`
+
+**レースの区間ごとのラップ**（2026-08-17 追加）。走破時計と上がり3Fだけでは、前半が速かったのか、
+途中のどこで流れが変わったのかを強く言えない。**そこを言えるようにするための土台。**
+
+| カラム | 型 | 内容 | いつ埋まるか |
+| --- | --- | --- | --- |
+| `id` | bigserial | PK | |
+| `race_id` | bigint | FK → `races` | |
+| `lap_number` | int | **何区間目か。** スタート側から1で始まる | レース後 |
+| `distance_m` | int | その区間の距離。通常は200 | レース後 |
+| `time_ms` | int | その区間の時計。**取れなければ null** | レース後 |
+| `created_at` `updated_at` | timestamptz | | |
+
+- UNIQUE: `(race_id, lap_number)`。同じ区間の二重登録を塞ぐ。**`race_id` はこの先頭列で引ける**ので
+  索引は別に張らない
+- **区間の本数を固定しない。** 2000m なら200mずつで10区間になるが、距離や取得元の都合で区間の
+  数も長さも変わる。**距離を行ごとに持つ**ことで、最初の区間だけ長いレースもそのまま入る
+- **単位はミリ秒とメートル。** `entries.finish_time_ms` `last_3f_ms` と揃えてある
+- **取れなかった区間を0で埋めない。** `time_ms` は正の数しか入らない CHECK を付けてあるので、
+  0 は弾かれる。**行が無い区間も、`time_ms` が null の区間も「取れなかった」**であって「0秒」では
+  ない
+- **ラップが1行も無いレースは普通に起きる。** そのときは前半の速さや流れの変化を断定せず、
+  材料が足りないものとして扱う（[agent-design.md](agent-design.md#ラップと予想時点の前提2026-08-17-決定)）
 
 ### レース名の扱い
 
@@ -463,6 +492,40 @@ DB側に別名のテーブルは持たない。マスタは JRA の正式名称�
 | `predicted_at` | timestamptz | |
 | `created_at` `updated_at` | timestamptz | |
 
+### `race_prediction_conditions`
+
+**予想を出した時点で分かっていた、馬場と天候の前提**（2026-08-17 追加）。`race_predictions` が
+「どういうレースになると読んだか」なのに対し、こちらは**その読みが何を前提にしていたか**。
+
+| カラム | 型 | 内容 |
+| --- | --- | --- |
+| `id` | bigserial | PK |
+| `race_id` | bigint | 一意。FK → `races` |
+| `predicted_at` | timestamptz | **いつ時点の前提か。** `race_predictions.predicted_at` と揃える |
+| `track_division` | text | コース区分。「Aコース」「Bコース」など。**取れなければ null** |
+| `body` | text | 前提そのもの。予報、馬場の見込み、公表済みの数値、**取れなかったもの** |
+| `author` | text | AI / 人間 / 対話 |
+| `created_at` `updated_at` | timestamptz | |
+
+**予想時点のものとレース後のものを、置き場で分ける。**
+
+| どこに | 何が入るか | いつ入るか |
+| --- | --- | --- |
+| `races.weather_forecast` | 予想時点の天気予報（「曇のち雨」） | 予想時点 |
+| **`race_prediction_conditions`** | **予報以外の、予想時点で分かっていた前提** | 予想時点 |
+| `races.track_condition` `races.weather` | **実際の馬場と天気** | レース後 |
+
+**レース後に実際の馬場を入れても、前提は書き換わらない。** 別のテーブルなので、上書きしようが
+ない。土曜に置いた前提と日曜に確定した馬場が同時に残り、**どちらがどちらかを取り違えられない。**
+
+- **開催の進み具合は重ねて持たない。** 何回何日目かは `races.meeting_number` `meeting_day` に
+  あるので、そこから読めないこと（開催が進んで内が荒れてきた、など）だけを `body` に書く
+- **取れなかった項目は、取れなかったと `body` に書く。** 書かずに空けると、調べていないのか
+  調べて無かったのかが分からない。**推測値で埋めない**
+- `track_division` だけ列にしてあるのは、**レースをまたいで揃えて見たいのがここだから**。
+  文章の中に混ぜると比べられない。区分の無い開催もあるので null 可
+- **1レースにつき1行の上書き。** 予想をやり直したら前提も入れ直す
+
 ### 予想と回収率
 
 - 予想は**枠順確定直後**に出す。記事にするのもこの予想
@@ -637,7 +700,7 @@ WIN5 は `leg_group` を「対象5レースの発走順で1〜5」として使�
 | 種類 | 対象 |
 | --- | --- |
 | RESTRICT | `races.course_id` / `entries` の全FK / `horses.sire_id` `dam_id` `trainer_id` / `*_predictions.mark_id` / `*_bets.race_id` / `*_bet_legs.entry_id` |
-| CASCADE | 評価8テーブルの対象FK / `entry_comments.entry_id` / `*_predictions.entry_id` / `race_predictions.race_id` / `*_bet_legs` の bet へのFK |
+| CASCADE | 評価8テーブルの対象FK / `entry_comments.entry_id` / `*_predictions.entry_id` / `race_predictions.race_id` / `race_prediction_conditions.race_id` / `race_laps.race_id` / `*_bet_legs` の bet へのFK |
 
 **`entries.race_id` を CASCADE にしていないのが要点。** CASCADE にするとレースを1行消しただけで
 出走 → 出走ごとの評価 → 予想 → 買い目まで一気に消える。手で書いた評価が巻き添えで消えるのが
@@ -669,7 +732,8 @@ UPDATE 文に `updated_at = now()` を書き忘れると「いつ時点の話か
 | `entry_comments` | `entry_id` | 「この出走のコメント」で引く。一意制約が無いので索引を兼ねるものが無い |
 
 評価8テーブルと予想の対象FKは UNIQUE 制約が索引を兼ねるので張らない。`entries.race_id` も
-`(race_id, horse_id)` の先頭列で引ける。
+`(race_id, horse_id)` の先頭列で引ける。`race_laps.race_id` も `(race_id, lap_number)` の先頭列で
+引ける。
 
 ---
 
@@ -695,7 +759,7 @@ TypeScript から使う写しは [lib/enums/](../lib/enums/) にある。**正�
 | `sex` | 牡 / 牝 / セン | `horses` |
 | `affiliation` | 美浦 / 栗東 / 地方 / 外国 | `jockeys` `trainers` |
 | `status` | 出走 / 取消 / 除外 / 中止 / 失格 | `entries` |
-| `author` | AI / 人間 / 対話（`race_predictions` は AI / 対話 のみ） | 評価8テーブル、`entry_comments`、`race_predictions` |
+| `author` | AI / 人間 / 対話（`race_predictions` は AI / 対話 のみ） | 評価8テーブル、`entry_comments`、`race_predictions`、`race_prediction_conditions` |
 | `race_phase` | レース前 / レース後 | `entry_comments` |
 | `speaker_role` | 騎手 / 調教師 / 調教助手 / 厩務員 / 馬主 / 生産者 / その他 | `entry_comments` |
 | `ticket_type` | 単勝 / 複勝 / 枠連 / 馬連 / 馬単 / ワイド / 3連複 / 3連単 / WIN5 | `ai_bets` `my_bets` |

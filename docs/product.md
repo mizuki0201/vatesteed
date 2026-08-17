@@ -68,7 +68,7 @@
 | 要素 | 実体 | 役割 |
 | --- | --- | --- |
 | エージェント | `agent/` + `lib/` | 分析・予想・発信を実行する。Phase 1 のエンジンは Claude Code |
-| ナレッジDB | Neon (Postgres) 25テーブル | 評価と解釈の蓄積先。[data-model.md](data-model.md) |
+| ナレッジDB | Neon (Postgres) 27テーブル | 評価と解釈の蓄積先。[data-model.md](data-model.md) |
 | ダッシュボード | `app/` (Next.js) | 人間が見る画面。閲覧権限で出し分ける |
 | 発信チャネル | note / Zenn / X | 外向けの出力。[publishing.md](publishing.md) |
 | 設計ドキュメント | `docs/` | 上記すべての正本 |
@@ -143,8 +143,13 @@ Vatesteed の運用の中心は **「競馬について対話する」**（1）�
 | きっかけ | 枠順確定直後（**検知方法は未決**） |
 | 人間 | 対象レースを選ぶ。取得内容を確認する。解釈を足す |
 | AI | 情報を集めて登録し、各馬を評価し、展開と着順を予想し、買い目を組む |
-| 成果物 | `ai_predictions` `race_predictions` `ai_bets` / note 記事 |
+| 成果物 | `ai_predictions` `race_predictions` `race_prediction_conditions` `ai_bets` / note 記事 |
 | 関係するスキル | register-race → 各分析 → predict-race → plan-bets |
+
+**出した予想は、出した時点で固定する。** 枠順が確定する金曜か土曜に作り、日曜のレース前に出す。
+**当日の馬場を見てから公開済みの予想・買い目・記事を書き直さない。** 当日の話は運用1の対話として
+扱う（理由と、予想時点の前提をどこに置くかは
+[agent-design.md](agent-design.md#ラップと予想時点の前提2026-08-17-決定)）。
 
 馬券は実際に買わず、**購入ポートフォリオだけ出力して擬似的に購入**し回収率を計測する。
 **1レースあたりの予算は 2,000円で固定**し、レースの格や自信度で変えない（理由と手順は
@@ -316,7 +321,7 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 | --- | --- | --- | --- |
 | register-race | 進行役 | — | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | review-race | 進行役 | — | [agent-design.md の振り返りの手順](agent-design.md#振り返りの手順2026-08-16-決定) |
-| predict-race | 予想 | `race_predictions` `ai_predictions` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
+| predict-race | 予想 | `race_predictions` `race_prediction_conditions` `ai_predictions` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | plan-bets | 予想 | `ai_bets` `ai_bet_legs` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | improve-agent | 常に働く | `docs/` `agent/` | agent-design.md（**未記述**） |
 | write-note-article | 発信 | — | publishing.md |
@@ -348,7 +353,7 @@ publishing.md に書いてから、スキルをそこから書き起こす。
 | `/about` | Vatesteed の紹介 | public |
 | `/login` `/logout` | パスワードの入口 | public |
 | `/tech` | 技術情報のまとめ。構成と各技術画面へのリンク | public |
-| `/tech/database` | DB 設計。25テーブルの図と説明 | public |
+| `/tech/database` | DB 設計。27テーブルの図と説明 | public |
 | `/races` | レースの一覧（検索できる） | member |
 | `/races/[id]` | **レースの詳細。** 出走表・印・評価・展開の予想・買い目 | member |
 | `/results/ai` | AI の成績と回収率。購入日で期間を絞り込める | member |

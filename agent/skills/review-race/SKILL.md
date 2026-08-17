@@ -32,6 +32,7 @@ description: レースが終わったあと、結果の取り込みから評価�
 | --- | --- |
 | `entries` | `finish_position` `margin` `popularity` `win_odds` `finish_time_ms` `last_3f_ms` `corner_positions` `body_weight` `body_weight_diff` |
 | `races` | `weather` `track_condition` |
+| `race_laps` | **区間ごとのラップ。** 何区間目か・その区間の距離・その区間の時計 |
 | `race_payouts` | **確定払戻。** 券種ごとに、当たった組み合わせ・100円あたりの払戻金・人気 |
 
 - **走らなかった馬は `status` を直す**（取消・除外・中止・失格）。着順が入るのは `出走` の
@@ -45,6 +46,27 @@ description: レースが終わったあと、結果の取り込みから評価�
   検算のために入れる
 - SQL は `pnpm db:query`。値は必ず `--params` で渡す
 - 裏取りの基準は予想のときと同じ。**2回試して確からしい値が取れなければ、取れなかったと残す**
+- **予想時点の前提（`race_prediction_conditions`）には手を入れない。** 実際の馬場は `races` 側に
+  入るので、前提を直す理由が無い。**当日の情報で公開済みの予想を書き換えない**
+
+### ラップを入れる
+
+区間ごとのラップは `race_laps` に、**1区間1行**で入れる。順序は `lap_number`（スタート側から
+1で始まる）、単位はミリ秒とメートル。
+
+```sql
+INSERT INTO race_laps (race_id, lap_number, distance_m, time_ms) VALUES ($1, $2, $3, $4)
+ON CONFLICT (race_id, lap_number) DO UPDATE
+  SET distance_m = EXCLUDED.distance_m, time_ms = EXCLUDED.time_ms
+RETURNING id;
+```
+
+- **区間の本数を決め打ちしない。** 2000m なら200mずつで10区間になるが、距離や取得元によって
+  区間の数も長さも変わる。**取れた形のまま入れる**
+- **取れなかった区間を0で埋めない。** `time_ms` を空にするか、その行を作らない。0 は CHECK が弾く
+- **ラップが取れなくても、そこで止まらない。** 入れられなかったことを 2 の呼び出しで伝えれば、
+  役は前半の速さを断定せずに書く（→
+  [docs/agent-design.md](../../../docs/agent-design.md#ペースはラップから読む無いなら断定しない)）
 
 ### レース後のコメントも入れる
 
@@ -65,7 +87,7 @@ description: レースが終わったあと、結果の取り込みから評価�
 相手関係から見てどの程度の内容だったかを読んで `race_notes` に残す。
 
 渡すのは**どのレースかと、人間から出た観察**（見た印象、レース後のコメント）。DB から読める
-ものは役が自分で引く。
+ものは役が自分で引く。**ラップも `race_laps` から役が自分で引く**ので、渡さなくてよい。
 
 ## 3. 出走を1つずつ読み直す
 

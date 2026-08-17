@@ -244,6 +244,10 @@ Neon をプロジェクトに接続する際の Environments は **Development /
 
 ただし「先週の東京はこう変化した」の形で、都度型が蓄積型に転化する部分もある。
 
+**予想の前提になった都度取得型は、予想時点のまま残す**（[data-model.md](data-model.md#race_prediction_conditions)）。
+鮮度が全ての情報でも、**その予想が何に乗っていたかは後から動かせない事実**にあたる。レース後に
+確定する実際の馬場とは置き場を分けてある。
+
 ## アクセス制御
 
 序列: **owner > friend > member > public**

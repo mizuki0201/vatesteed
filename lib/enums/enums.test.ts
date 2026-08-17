@@ -104,6 +104,8 @@ const EXPECTED: Record<string, readonly string[]> = {
   "entry_comments.race_phase": COMMENT_RACE_PHASES,
   "entry_comments.speaker_role": COMMENT_SPEAKER_ROLES,
   "race_predictions.author": RACE_PREDICTION_AUTHORS,
+  // 予想時点の前提は、人間だけが書くこともある（馬場を見た話が人間の側にしか無い場合）
+  "race_prediction_conditions.author": NOTE_AUTHORS,
   "ai_bets.ticket_type": TICKET_TYPES,
   "race_payouts.ticket_type": PAYOUT_TICKET_TYPES,
   "my_bets.ticket_type": TICKET_TYPES,

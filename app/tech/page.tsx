@@ -31,7 +31,7 @@ const PAGES: readonly { readonly href: string; readonly title: string; readonly 
   {
     href: "/tech/database",
     title: "DB 設計",
-    body: "25テーブルの構成と、テーブルどうしのつながり",
+    body: "27テーブルの構成と、テーブルどうしのつながり",
   },
 ];
 

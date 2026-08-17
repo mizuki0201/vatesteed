@@ -100,6 +100,17 @@ const GROUPS: readonly Group[] = [
         ],
         unique: "(race_id, horse_id) と (race_id, horse_number)",
       },
+      {
+        name: "race_laps",
+        what: "区間ごとのラップ。区間の本数は決め打ちせず、距離を行ごとに持つ",
+        columns: [
+          "race_id →races",
+          "lap_number（何区間目か）",
+          "distance_m",
+          "time_ms（取れなければ空。0 は入らない）",
+        ],
+        unique: "(race_id, lap_number)",
+      },
     ],
   },
   {
@@ -202,6 +213,18 @@ const GROUPS: readonly Group[] = [
         name: "race_predictions",
         what: "展開の見立て。AI と人間が対話で作るので1つ",
         columns: ["race_id →races", "body", "author", "predicted_at"],
+        unique: "race_id",
+      },
+      {
+        name: "race_prediction_conditions",
+        what: "予想を出した時点で分かっていた馬場と天候の前提。レース後の実績とは別に持つ",
+        columns: [
+          "race_id →races",
+          "predicted_at",
+          "track_division（コース区分）",
+          "body",
+          "author",
+        ],
         unique: "race_id",
       },
     ],

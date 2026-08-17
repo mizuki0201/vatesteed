@@ -6,7 +6,7 @@
 （[decisions/0004](decisions/0004-migrations-without-orm.md)）。
 
 **2026-08-09 に本番へ適用済み**（`migration-test` ブランチで通してから流した）。当初22テーブル、
-現在24。
+現在25。
 
 このドキュメントは**何をどう持つか（設計）**の正本で、**今DBに何があるか**は
 [db/schema.sql](../db/schema.sql) を見る。あちらは `pnpm db:migrate` が毎回書き出す生成物
@@ -39,7 +39,9 @@
 - **出走ごとの評価は保存する実体。** 書かれるのはそのレースの直後で、次の予想のときに作り直すのではない
 - **事実と読み取りは分けず、1つの文章にまとめる**
 - 過去の出来事についての評価なので、後から変わることは少ない。ただし変わることもある
-- **間違っていたもの・修正されたものは残さない。** 上書きで、履歴は持たない。DBには正しいものだけを置く
+- **間違っていたもの・修正されたものは残さない。** 上書きで、履歴は持たない。DBには正しいものだけを置く。
+  **これは評価の話。** 騎手と陣営が述べたことは評価ではないので、[`entry_comments`](#コメント) に
+  発言のたびの履歴として残す
 - **書き手はAIと人間の両方。** AIが取れる情報はAIが取り、人間が補う。誰が書いたかは `author` で区別する。
   **`author` は表示のためだけの列ではない。** 人間や対話が書いた行を AI が単独で上書きしないための
   判別に使う（[product.md](product.md#人間の読みは勝手に上書きしない)）
@@ -60,18 +62,20 @@
 [compliance.md](compliance.md) の方針で自動収集にあたるため、**確実に取得できる経路が無い**。
 後から必要になったらカラムを1本足すだけで済む。
 
-### テーブル一覧（24）
+### テーブル一覧（25）
 
 | 分類 | テーブル |
 | --- | --- |
 | 土台（6） | `courses` `races` `horses` `jockeys` `trainers` `entries` |
 | 評価（8） | `entry_notes` `horse_notes` `pedigree_notes` `progeny_notes` `jockey_notes` `trainer_notes` `course_notes` `race_notes` |
+| コメント（1） | `entry_comments` |
 | 予想（4） | `marks` `ai_predictions` `my_predictions` `race_predictions` |
 | 購入（4） | `ai_bets` `ai_bet_legs` `my_bets` `my_bet_legs` |
 | 確定払戻（1） | `race_payouts` |
 | 閲覧権限（1） | `users` |
 
-**当初は22だった。** `race_payouts` を 2026-08-16 に、`progeny_notes` を同日に足している。
+**当初は22だった。** `race_payouts` を 2026-08-16 に、`progeny_notes` を同日に、
+`entry_comments` を 2026-08-17 に足している。
 
 中心は `entries`（出走）。1行が「ある馬がある1レースに出た分」にあたり、馬とレースを繋いでいる。
 
@@ -341,6 +345,78 @@ DB側に別名のテーブルは持たない。マスタは JRA の正式名称�
 
 ---
 
+## コメント
+
+### `entry_comments`
+
+**騎手と陣営が述べたことを、発言のたびに1行ずつ残す**（2026-08-17 追加）。入るのは
+**「誰が・いつ・どちら側で・何を述べたか」**であって、述べた内容が本当かどうかではない。
+
+| カラム | 型 | 内容 |
+| --- | --- | --- |
+| `id` | bigserial | PK |
+| `entry_id` | bigint | FK → `entries`。**どの馬の、どのレースについての発言か** |
+| `race_phase` | text | レース前 / レース後 |
+| `speaker_role` | text | 騎手 / 調教師 / 調教助手 / 厩務員 / 馬主 / 生産者 / その他 |
+| `speaker_name` | text | 発言者の名前。分からなければ null |
+| `spoken_on` | date | 発言があった日。分からなければ null |
+| `summary` | text | **何を述べたかの要約。400字まで** |
+| `interpretation` | text | そこから読み取った含意。**述べられたことそのものではない** |
+| `source` | text | どこで見たか。媒体の名前など。**本文と長い引用は入れない** |
+| `author` | text | この行を登録した人。AI / 人間 / 対話 |
+| `created_at` `updated_at` | timestamptz | |
+
+- **一意制約は張らない。張れない。** 同じ人が同じ日に別のことを述べることがあるので、機械的な
+  自然キーが決まらない。**その代わり、登録の前に同じ出走・同じ時点・同じ発言者の行が無いかを
+  探す。** `horses` `jockeys` `trainers` を名前で探してから作るのと同じ形にあたる
+- `summary` は **400字を上限として CHECK で縛っている。** 取得したページの本文をそのまま貼れない
+  長さにして、[compliance.md](compliance.md) の「残すのは要約・評価した内容」を仕組みの側で守る
+- **`spoken_on` が null なのは「日付が無い」ではなく「取れなかった」。** `race_phase` は必須なので、
+  日付が取れなくてもレースの前後は分かる
+- インデックスは `entry_id`。引く動線は「この出走のコメント」と「この厩舎が過去に述べたこと」で、
+  後者は `entries.trainer_id` の索引をたどる
+- **登録するのはオーケストレーター。** 分析する役は読むだけで、自分では入れない
+  （[agent-design.md](agent-design.md#コメントをどう読むか2026-08-17-決定)）
+
+#### なぜ出走に紐づけるか
+
+コメントは「どの馬の、どのレースについて」の話になるので、**馬とレースの両方を持つ `entries` が
+そのまま対象になる**。レース前とレース後の別も、レースが決まって初めて意味を持つ。
+
+**引き受ける制約は、出走が DB に無い時期の発言を残せないこと。** 過去のレースは読むと決めた
+出走だけを登録する（[agent-design.md](agent-design.md#過去の出走をどこまで登録するか)）ので、
+登録していない出走についての発言は置き場が無い。**残したいなら、その出走を先に登録する。**
+
+#### 発言者に外部キーを張らない
+
+`speaker_role` と `speaker_name` の文字で持つ。**調教助手と厩務員は `jockeys` にも `trainers` にも
+居ない**うえ、騎手のコメントも**その出走に乗った騎手のものとは限らない**（乗り替わりの前の騎手が
+述べることがある）。FK を張ると、この2つがどちらも入らなくなる。
+
+`speaker_role` は入っていい値を CHECK で縛っているが、**肩書きを網羅するための一覧ではない。**
+当てはまらないものは「その他」にして、肩書きは `speaker_name` に書く。
+
+#### 評価8テーブルとの分け方
+
+| | 何が入るか | 上書き |
+| --- | --- | --- |
+| 評価8テーブル | **読んだ結果の評価。** 事実と読み取りを混ぜた1つの文章 | 1対象1行の上書き。履歴は持たない |
+| `entry_comments` | **発言の記録。** 誰が・いつ・どちら側で・何を述べたか | 出走1つに何行でも。時系列で残る |
+
+- **コメントは事実ではない。** 「次を見据えて」は、陣営がそう述べたという記録であって、
+  仕上げていなかったという事実ではない。事実として使うなら、調整過程や実際のレース内容と
+  突き合わせる（読み方は [agent-design.md](agent-design.md#コメントをどう読むか2026-08-17-決定)）
+- **コメントを登録しても評価は変わらない。** `*_notes` を更新するかどうかは、読んだ役と
+  オーケストレーターが決める。**登録がそのまま評価を書き換える経路は作らない。** 人間や対話が
+  書いた評価は、コメントが増えただけでは動かない
+- **同じ言い回しの繰り返しや、レース前後での説明の変化を後から比べられる**ことが、履歴で持つ
+  理由にあたる。現在の評価に混ぜると、誰がいつ述べたのかが失われて比べられなくなる
+
+**ここで履歴を持つのは、コメントが評価ではないから。** 評価そのものに履歴を持たせるかどうかは
+別の問いで、未決のまま（[development.md の未決の問い](development.md#未決の問い)の1番）。
+
+---
+
 ## 予想
 
 ### `marks`
@@ -561,7 +637,7 @@ WIN5 は `leg_group` を「対象5レースの発走順で1〜5」として使�
 | 種類 | 対象 |
 | --- | --- |
 | RESTRICT | `races.course_id` / `entries` の全FK / `horses.sire_id` `dam_id` `trainer_id` / `*_predictions.mark_id` / `*_bets.race_id` / `*_bet_legs.entry_id` |
-| CASCADE | 評価8テーブルの対象FK / `*_predictions.entry_id` / `race_predictions.race_id` / `*_bet_legs` の bet へのFK |
+| CASCADE | 評価8テーブルの対象FK / `entry_comments.entry_id` / `*_predictions.entry_id` / `race_predictions.race_id` / `*_bet_legs` の bet へのFK |
 
 **`entries.race_id` を CASCADE にしていないのが要点。** CASCADE にするとレースを1行消しただけで
 出走 → 出走ごとの評価 → 予想 → 買い目まで一気に消える。手で書いた評価が巻き添えで消えるのが
@@ -590,6 +666,7 @@ UPDATE 文に `updated_at = now()` を書き忘れると「いつ時点の話か
 | `horses` | `sire_id` `dam_id` `trainer_id` | 産駒・全兄弟・管理馬 |
 | `horses` `jockeys` `trainers` | `name` | 登録時に「もう居るか」を名前で探す |
 | `ai_bets` `my_bets` | `race_id` | |
+| `entry_comments` | `entry_id` | 「この出走のコメント」で引く。一意制約が無いので索引を兼ねるものが無い |
 
 評価8テーブルと予想の対象FKは UNIQUE 制約が索引を兼ねるので張らない。`entries.race_id` も
 `(race_id, horse_id)` の先頭列で引ける。
@@ -618,7 +695,9 @@ TypeScript から使う写しは [lib/enums/](../lib/enums/) にある。**正�
 | `sex` | 牡 / 牝 / セン | `horses` |
 | `affiliation` | 美浦 / 栗東 / 地方 / 外国 | `jockeys` `trainers` |
 | `status` | 出走 / 取消 / 除外 / 中止 / 失格 | `entries` |
-| `author` | AI / 人間 / 対話（`race_predictions` は AI / 対話 のみ） | 評価8テーブル、`race_predictions` |
+| `author` | AI / 人間 / 対話（`race_predictions` は AI / 対話 のみ） | 評価8テーブル、`entry_comments`、`race_predictions` |
+| `race_phase` | レース前 / レース後 | `entry_comments` |
+| `speaker_role` | 騎手 / 調教師 / 調教助手 / 厩務員 / 馬主 / 生産者 / その他 | `entry_comments` |
 | `ticket_type` | 単勝 / 複勝 / 枠連 / 馬連 / 馬単 / ワイド / 3連複 / 3連単 / WIN5 | `ai_bets` `my_bets` |
 | `bet_style` | 単点 / ボックス / 流し / フォーメーション | `ai_bets` `my_bets` |
 | `access_level` | owner / friend / member / public | `users` |

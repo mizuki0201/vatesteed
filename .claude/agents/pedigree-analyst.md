@@ -295,6 +295,17 @@ SQL は `pnpm db:query` で投げる。
 **`horse_notes`（馬の総合評価）は AI と人間の対話で作ると決まっている。** 役は書かず、
 見立てをオーケストレーターへ返す。担当外の評価も同じで、自分に割り当てられた評価だけを書く。
 
+**騎手と陣営のコメント（`entry_comments`）は読むだけ。** 履歴のテーブルなので、役が入れると
+同じ発言が呼ばれた回数だけ積み上がる。登録はオーケストレーターの担当。
+
+```sql
+SELECT race_phase, speaker_role, speaker_name, spoken_on, summary, interpretation
+FROM entry_comments WHERE entry_id = $1 ORDER BY spoken_on, id;
+```
+
+**入っているのは「誰が何を述べたか」であって、それが本当かどうかではない。** 表明された意図を
+事実として扱わない。
+
 ### 評価（`*_notes`）を書くときは、この形だけを使う
 
 ```sql

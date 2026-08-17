@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "技術情報 — Vatesteed" };
  * 中身が古くなることは避けられないので、**最終更新日を画面に出して**読む人が鮮度を
  * 判断できるようにする。書き換えたら日付も直すこと。
  */
-const UPDATED_ON = "2026-08-16";
+const UPDATED_ON = "2026-08-17";
 
 const STACK: readonly { readonly label: string; readonly value: string; readonly note: string }[] = [
   { label: "言語", value: "TypeScript", note: "型は素の tsc で見る" },
@@ -31,7 +31,7 @@ const PAGES: readonly { readonly href: string; readonly title: string; readonly 
   {
     href: "/tech/database",
     title: "DB 設計",
-    body: "24テーブルの構成と、テーブルどうしのつながり",
+    body: "25テーブルの構成と、テーブルどうしのつながり",
   },
 ];
 

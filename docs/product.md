@@ -68,7 +68,7 @@
 | 要素 | 実体 | 役割 |
 | --- | --- | --- |
 | エージェント | `agent/` + `lib/` | 分析・予想・発信を実行する。Phase 1 のエンジンは Claude Code |
-| ナレッジDB | Neon (Postgres) 24テーブル | 評価と解釈の蓄積先。[data-model.md](data-model.md) |
+| ナレッジDB | Neon (Postgres) 25テーブル | 評価と解釈の蓄積先。[data-model.md](data-model.md) |
 | ダッシュボード | `app/` (Next.js) | 人間が見る画面。閲覧権限で出し分ける |
 | 発信チャネル | note / Zenn / X | 外向けの出力。[publishing.md](publishing.md) |
 | 設計ドキュメント | `docs/` | 上記すべての正本 |
@@ -348,7 +348,7 @@ publishing.md に書いてから、スキルをそこから書き起こす。
 | `/about` | Vatesteed の紹介 | public |
 | `/login` `/logout` | パスワードの入口 | public |
 | `/tech` | 技術情報のまとめ。構成と各技術画面へのリンク | public |
-| `/tech/database` | DB 設計。24テーブルの図と説明 | public |
+| `/tech/database` | DB 設計。25テーブルの図と説明 | public |
 | `/races` | レースの一覧（検索できる） | member |
 | `/races/[id]` | **レースの詳細。** 出走表・印・評価・展開の予想・買い目 | member |
 | `/results/ai` | AI の成績と回収率。購入日で期間を絞り込める | member |

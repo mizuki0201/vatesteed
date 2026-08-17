@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "DB 設計 — Vatesteed" };
  *
  * スキーマを変えたら、ここと `UPDATED_ON` も直す。**直し忘れても分かるように日付を出す。**
  */
-const UPDATED_ON = "2026-08-16";
+const UPDATED_ON = "2026-08-17";
 
 type Table = {
   readonly name: string;
@@ -153,6 +153,27 @@ const GROUPS: readonly Group[] = [
         what: "レースの評価。走ったあと",
         columns: ["race_id →races", "body", "author"],
         unique: "race_id",
+      },
+    ],
+  },
+  {
+    heading: "コメント",
+    what: "騎手と陣営が述べたことの記録。評価と違って上書きせず、発言のたびに1行ずつ溜まる",
+    tables: [
+      {
+        name: "entry_comments",
+        what: "誰が・いつ・レースのどちら側で・何を述べたか。述べた内容が本当かどうかは別",
+        columns: [
+          "entry_id →entries",
+          "race_phase（レース前 / レース後）",
+          "speaker_role",
+          "speaker_name",
+          "spoken_on",
+          "summary（400字まで）",
+          "interpretation（読み取った含意）",
+          "source",
+          "author",
+        ],
       },
     ],
   },

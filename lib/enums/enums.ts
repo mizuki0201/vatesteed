@@ -102,6 +102,35 @@ export const RACE_PREDICTION_AUTHORS = ["AI", "対話"] as const satisfies reado
 export type RacePredictionAuthor = (typeof RACE_PREDICTION_AUTHORS)[number];
 
 // ---------------------------------------------------------------------------
+// コメント
+// ---------------------------------------------------------------------------
+
+/**
+ * `entry_comments.race_phase`。**レースのどちら側で述べたか。**
+ *
+ * 日付（`spoken_on`）は取れないことがあるが、前後はコメントを読む前提になるので必須。
+ */
+export const COMMENT_RACE_PHASES = ["レース前", "レース後"] as const;
+export type CommentRacePhase = (typeof COMMENT_RACE_PHASES)[number];
+
+/**
+ * `entry_comments.speaker_role`。**誰の発言かが分かればよく、肩書きの網羅ではない。**
+ *
+ * 当てはまらないものは「その他」にして、肩書きは `speaker_name` に書く
+ * （docs/data-model.md#発言者に外部キーを張らない）。
+ */
+export const COMMENT_SPEAKER_ROLES = [
+  "騎手",
+  "調教師",
+  "調教助手",
+  "厩務員",
+  "馬主",
+  "生産者",
+  "その他",
+] as const;
+export type CommentSpeakerRole = (typeof COMMENT_SPEAKER_ROLES)[number];
+
+// ---------------------------------------------------------------------------
 // 購入
 // ---------------------------------------------------------------------------
 

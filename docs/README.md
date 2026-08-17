@@ -10,7 +10,7 @@ Vatesteed の設計ドキュメント。
 | [development.md](development.md) | **Vatesteed 自体を作る側の正本。** 開発の体制・役・進め方 |
 | [concept.md](concept.md) | 再現したい思考プロセス、設計思想、差別化 |
 | [architecture.md](architecture.md) | eve + Next.js + DB の構成、開発フェーズ、アクセス制御 |
-| [data-model.md](data-model.md) | スキーマの正本。24テーブル。ORM は使わず手書きSQLで流す |
+| [data-model.md](data-model.md) | スキーマの正本。25テーブル。ORM は使わず手書きSQLで流す |
 | [agent-design.md](agent-design.md) | サブエージェント・skills の構想。**大部分が未確定** |
 | [publishing.md](publishing.md) | Zenn / note / X の運用と有料化への備え |
 | [compliance.md](compliance.md) | 法務方針、自動アクセス禁止ドメインのリスト |

@@ -12,6 +12,7 @@
 --   0006_progeny_notes.sql
 --   0007_races_entry_list_complete.sql
 --   0008_horses_retired_at.sql
+--   0009_entry_comments.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -142,6 +143,26 @@ CREATE TABLE entries (
   CONSTRAINT entries_horse_number_check CHECK ((horse_number > 0)),
   CONSTRAINT entries_popularity_check CHECK ((popularity > 0)),
   CONSTRAINT entries_status_check CHECK ((status = ANY (ARRAY['出走'::text, '取消'::text, '除外'::text, '中止'::text, '失格'::text])))
+);
+
+CREATE TABLE entry_comments (
+  id             bigserial                NOT NULL,
+  entry_id       bigint                   NOT NULL,
+  race_phase     text                     NOT NULL,
+  speaker_role   text                     NOT NULL,
+  speaker_name   text,
+  spoken_on      date,
+  summary        text                     NOT NULL,
+  interpretation text,
+  source         text,
+  author         text                     NOT NULL,
+  created_at     timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at     timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT entry_comments_pkey PRIMARY KEY (id),
+  CONSTRAINT entry_comments_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT entry_comments_race_phase_check CHECK ((race_phase = ANY (ARRAY['レース前'::text, 'レース後'::text]))),
+  CONSTRAINT entry_comments_speaker_role_check CHECK ((speaker_role = ANY (ARRAY['騎手'::text, '調教師'::text, '調教助手'::text, '厩務員'::text, '馬主'::text, '生産者'::text, 'その他'::text]))),
+  CONSTRAINT entry_comments_summary_length CHECK ((char_length(summary) <= 400))
 );
 
 CREATE TABLE entry_notes (
@@ -416,6 +437,7 @@ ALTER TABLE entries ADD CONSTRAINT entries_horse_id_fkey FOREIGN KEY (horse_id) 
 ALTER TABLE entries ADD CONSTRAINT entries_jockey_id_fkey FOREIGN KEY (jockey_id) REFERENCES jockeys(id) ON DELETE RESTRICT;
 ALTER TABLE entries ADD CONSTRAINT entries_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE RESTRICT;
 ALTER TABLE entries ADD CONSTRAINT entries_trainer_id_fkey FOREIGN KEY (trainer_id) REFERENCES trainers(id) ON DELETE RESTRICT;
+ALTER TABLE entry_comments ADD CONSTRAINT entry_comments_entry_id_fkey FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE;
 ALTER TABLE entry_notes ADD CONSTRAINT entry_notes_entry_id_fkey FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE;
 ALTER TABLE horse_notes ADD CONSTRAINT horse_notes_horse_id_fkey FOREIGN KEY (horse_id) REFERENCES horses(id) ON DELETE CASCADE;
 ALTER TABLE horses ADD CONSTRAINT horses_dam_id_fkey FOREIGN KEY (dam_id) REFERENCES horses(id) ON DELETE RESTRICT;
@@ -443,6 +465,7 @@ CREATE INDEX ai_bets_race_id_idx ON public.ai_bets USING btree (race_id);
 CREATE INDEX entries_horse_id_idx ON public.entries USING btree (horse_id);
 CREATE INDEX entries_jockey_id_idx ON public.entries USING btree (jockey_id);
 CREATE INDEX entries_trainer_id_idx ON public.entries USING btree (trainer_id);
+CREATE INDEX entry_comments_entry_id_idx ON public.entry_comments USING btree (entry_id);
 CREATE INDEX horses_dam_id_idx ON public.horses USING btree (dam_id);
 CREATE INDEX horses_name_idx ON public.horses USING btree (name);
 CREATE INDEX horses_sire_id_idx ON public.horses USING btree (sire_id);
@@ -463,6 +486,7 @@ CREATE TRIGGER ai_predictions_set_updated_at BEFORE UPDATE ON public.ai_predicti
 CREATE TRIGGER course_notes_set_updated_at BEFORE UPDATE ON public.course_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER courses_set_updated_at BEFORE UPDATE ON public.courses FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER entries_set_updated_at BEFORE UPDATE ON public.entries FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER entry_comments_set_updated_at BEFORE UPDATE ON public.entry_comments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER entry_notes_set_updated_at BEFORE UPDATE ON public.entry_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER horse_notes_set_updated_at BEFORE UPDATE ON public.horse_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER horses_set_updated_at BEFORE UPDATE ON public.horses FOR EACH ROW EXECUTE FUNCTION set_updated_at();

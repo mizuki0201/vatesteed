@@ -33,10 +33,19 @@ description: 展開を読み、着順を予想し、印をつける。register-r
 
 書き込む先は `race_predictions`。`author` は `AI`、人間と詰めたなら `対話`。
 
+**書く前に、予想時刻を1つ決める。** `race_predictions` と `race_prediction_conditions` は
+**同じ時点のもの**なので、[両方に同じ値を渡す](../../../docs/data-model.md#race_prediction_conditions)。
+
+- **`now()` を使わない。** 文を投げるたびに別の時刻が入り、展開の見立てと、その見立てが乗って
+  いた前提が、違う時点のものとして残る
+- 決めた時刻は `--params` に入れて渡す。**`ON CONFLICT` の側でも `EXCLUDED.predicted_at` を
+  使い、入れ直したときに `VALUES` と同じ値になるようにする**
+
 ```sql
 INSERT INTO race_predictions (race_id, body, author, predicted_at)
-VALUES ($1, $2, 'AI', now())
-ON CONFLICT (race_id) DO UPDATE SET body = EXCLUDED.body, author = 'AI', predicted_at = now()
+VALUES ($1, $2, 'AI', $3)
+ON CONFLICT (race_id) DO UPDATE
+  SET body = EXCLUDED.body, author = 'AI', predicted_at = EXCLUDED.predicted_at
 WHERE race_predictions.author = 'AI'
 RETURNING id;
 ```
@@ -52,13 +61,16 @@ RETURNING id;
 
 ```sql
 INSERT INTO race_prediction_conditions (race_id, predicted_at, track_division, body, author)
-VALUES ($1, now(), $2, $3, 'AI')
+VALUES ($1, $2, $3, $4, 'AI')
 ON CONFLICT (race_id) DO UPDATE
-  SET predicted_at = now(), track_division = EXCLUDED.track_division, body = EXCLUDED.body, author = 'AI'
+  SET predicted_at = EXCLUDED.predicted_at, track_division = EXCLUDED.track_division,
+      body = EXCLUDED.body, author = 'AI'
 WHERE race_prediction_conditions.author = 'AI'
 RETURNING id;
 ```
 
+- **`predicted_at` には、展開に渡したのと同じ値を渡す。** ここで `now()` を使うと、同じ予想の
+  展開と前提が違う時点のものになる
 - 入れるのは**予想を出す時点で分かっていたことだけ。** コース区分、開催がどこまで進んでいるか、
   予報、馬場の見込み、公表済みの数値
 - **取れなかったものは「取れなかった」と `body` に書く。** 空けたままにすると、調べていないのか

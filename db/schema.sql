@@ -14,6 +14,7 @@
 --   0008_horses_retired_at.sql
 --   0009_entry_comments.sql
 --   0010_race_laps_and_prediction_conditions.sql
+--   0011_notes_no_internal_terms.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -93,7 +94,8 @@ CREATE TABLE course_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT course_notes_pkey PRIMARY KEY (id),
   CONSTRAINT course_notes_course_id_key UNIQUE (course_id),
-  CONSTRAINT course_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT course_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT course_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text))
 );
 
 CREATE TABLE courses (
@@ -175,7 +177,8 @@ CREATE TABLE entry_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT entry_notes_pkey PRIMARY KEY (id),
   CONSTRAINT entry_notes_entry_id_key UNIQUE (entry_id),
-  CONSTRAINT entry_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT entry_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT entry_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text))
 );
 
 CREATE TABLE horse_notes (
@@ -187,7 +190,8 @@ CREATE TABLE horse_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT horse_notes_pkey PRIMARY KEY (id),
   CONSTRAINT horse_notes_horse_id_key UNIQUE (horse_id),
-  CONSTRAINT horse_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT horse_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT horse_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text))
 );
 
 CREATE TABLE horses (
@@ -215,7 +219,8 @@ CREATE TABLE jockey_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT jockey_notes_pkey PRIMARY KEY (id),
   CONSTRAINT jockey_notes_jockey_id_key UNIQUE (jockey_id),
-  CONSTRAINT jockey_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT jockey_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT jockey_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text))
 );
 
 CREATE TABLE jockeys (
@@ -305,7 +310,9 @@ CREATE TABLE pedigree_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT pedigree_notes_pkey PRIMARY KEY (id),
   CONSTRAINT pedigree_notes_horse_id_key UNIQUE (horse_id),
-  CONSTRAINT pedigree_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT pedigree_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT pedigree_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text)),
+  CONSTRAINT pedigree_notes_scope_no_internal_terms CHECK (((scope IS NULL) OR (scope !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text)))
 );
 
 CREATE TABLE progeny_notes (
@@ -318,7 +325,9 @@ CREATE TABLE progeny_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT progeny_notes_pkey PRIMARY KEY (id),
   CONSTRAINT progeny_notes_horse_id_key UNIQUE (horse_id),
-  CONSTRAINT progeny_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT progeny_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT progeny_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text)),
+  CONSTRAINT progeny_notes_scope_no_internal_terms CHECK (((scope IS NULL) OR (scope !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text)))
 );
 
 CREATE TABLE race_laps (
@@ -345,7 +354,8 @@ CREATE TABLE race_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT race_notes_pkey PRIMARY KEY (id),
   CONSTRAINT race_notes_race_id_key UNIQUE (race_id),
-  CONSTRAINT race_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT race_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT race_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text))
 );
 
 CREATE TABLE race_payouts (
@@ -425,7 +435,8 @@ CREATE TABLE trainer_notes (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT trainer_notes_pkey PRIMARY KEY (id),
   CONSTRAINT trainer_notes_trainer_id_key UNIQUE (trainer_id),
-  CONSTRAINT trainer_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text])))
+  CONSTRAINT trainer_notes_author_check CHECK ((author = ANY (ARRAY['AI'::text, '人間'::text, '対話'::text]))),
+  CONSTRAINT trainer_notes_body_no_internal_terms CHECK ((body !~ 'courses|races|horses|jockeys|trainers|entries|race_laps|entry_notes|horse_notes|pedigree_notes|progeny_notes|jockey_notes|trainer_notes|course_notes|race_notes|entry_comments|marks|ai_predictions|my_predictions|race_predictions|race_prediction_conditions|ai_bets|ai_bet_legs|my_bets|my_bet_legs|race_payouts|users|-analyst|verifier|_id|null|NULL|author|scope|created_at|updated_at|corner_positions|DB|データベース|テーブル|カラム|サブエージェント|オーケストレーター|プロンプト|マイグレーション'::text))
 );
 
 CREATE TABLE trainers (

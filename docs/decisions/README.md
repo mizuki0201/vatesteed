@@ -35,3 +35,4 @@
 | [0002](0002-note-tables-per-target.md) | 評価テーブルを対象ごとに分ける |
 | [0003](0003-bet-legs-as-columns.md) | 買い目を列で持つ |
 | [0004](0004-migrations-without-orm.md) | マイグレーション運用と ORM |
+| [0005](0005-notes-body-public-only.md) | 評価の本文は公開できるものだけにする |

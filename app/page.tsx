@@ -82,6 +82,12 @@ const GROUPS: readonly { readonly heading: string; readonly entries: readonly En
         body: "管理者専用のダッシュボード",
         capability: "dashboard",
       },
+      {
+        href: "/dashboard/record-memo",
+        title: "メモを残す",
+        body: "外で見かけた話を1つ置く。裏取りと行き先は、あとの対話で決める",
+        capability: "memos",
+      },
     ],
   },
 ];

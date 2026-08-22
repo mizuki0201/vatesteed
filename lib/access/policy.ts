@@ -46,6 +46,8 @@ export const REQUIRED_LEVEL = {
   "results.mine": "friend",
   /** 蓄積の横断一覧（7種類の評価をそのまま並べたもの）。 */
   "notes.raw": "owner",
+  /** 外で見かけた話のメモ。**入稿もここで縛る**（書き込みも同じ単位で守る）。 */
+  memos: "owner",
   /** 裏側の設計（誰にどこを見せているか）。 */
   dashboard: "owner",
 } as const satisfies Readonly<Record<string, AccessLevel>>;

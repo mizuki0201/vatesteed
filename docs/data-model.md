@@ -66,20 +66,22 @@
 [compliance.md](compliance.md) の方針で自動収集にあたるため、**確実に取得できる経路が無い**。
 後から必要になったらカラムを1本足すだけで済む。
 
-### テーブル一覧（27）
+### テーブル一覧（28）
 
 | 分類 | テーブル |
 | --- | --- |
 | 土台（7） | `courses` `races` `horses` `jockeys` `trainers` `entries` `race_laps` |
 | 評価（8） | `entry_notes` `horse_notes` `pedigree_notes` `progeny_notes` `jockey_notes` `trainer_notes` `course_notes` `race_notes` |
 | コメント（1） | `entry_comments` |
+| メモ（1） | `memos` |
 | 予想（5） | `marks` `ai_predictions` `my_predictions` `race_predictions` `race_prediction_conditions` |
 | 購入（4） | `ai_bets` `ai_bet_legs` `my_bets` `my_bet_legs` |
 | 確定払戻（1） | `race_payouts` |
 | 閲覧権限（1） | `users` |
 
 **当初は22だった。** `race_payouts` を 2026-08-16 に、`progeny_notes` を同日に、
-`entry_comments` `race_laps` `race_prediction_conditions` を 2026-08-17 に足している。
+`entry_comments` `race_laps` `race_prediction_conditions` を 2026-08-17 に、`memos` を
+2026-08-22 に足している。
 
 中心は `entries`（出走）。1行が「ある馬がある1レースに出た分」にあたり、馬とレースを繋いでいる。
 
@@ -463,6 +465,52 @@ DB側に別名のテーブルは持たない。マスタは JRA の正式名称�
 
 ---
 
+## メモ
+
+### `memos`
+
+**外で見かけた話を、その場で1つ残す先**（2026-08-22 追加）。SNS などで仕入れた話を、分類も
+判断もせずに置く。**入るのは評価ではなく、まだ確かめていない材料。**
+
+| カラム | 型 | 内容 |
+| --- | --- | --- |
+| `id` | bigserial | PK |
+| `body` | text | メモ本文。**400字まで** |
+| `source` | text | どこで見たか。URL か媒体の名前。無ければ null |
+| `status` | text | 未処理 / 取り込み済み / 見送り / 保留 |
+| `verification` | text | 裏取りで確かめたこと。**取れなければ取れなかったと書く**。処理前は null |
+| `outcome` | text | どこへ何を書いたか、または書かなかった理由。処理前は null |
+| `created_at` `updated_at` | timestamptz | |
+
+- **対象への外部キーを持たない。** 宛先を決めるのは取り込む側の仕事で、入稿の時点では
+  決まっていない。**入稿する人に分類させると、そこで手作業が固定される**
+  （[product.md](product.md#やらないこと)）。機械的に辿りたくなったら後から列を足す
+- **`author` を持たない。** ここに入るのは、定義上すべて人間が書いたもの
+- `body` は **400字を CHECK で縛る。** [`entry_comments`](#entry_comments) の `summary` と
+  同じ理由で、見たものの本文をそのまま貼れない長さにして、[compliance.md](compliance.md) の
+  「残すのは要約・評価した内容」を仕組みの側で守る
+- **`verification` と `outcome` を分ける。** 前者は確かめた事実、後者はそこからの判断。
+  `entry_comments` が `summary` と `interpretation` を分けているのと同じ
+- **取り込んだ後も消さない。** 同じ話が繰り返し流れることを、後から比べられる
+- インデックスは `status`。引く動線は「未処理と保留を古い順に」
+
+#### 保留は例外ではない
+
+外で見かける話の多くは「今週のあの馬」で、**その出走はまだ DB に無い**（出走が入るのは
+枠順が確定してから）。`entry_comments` は出走が無ければ置けないので、**入稿されたメモの多くは
+宛先ができるまで保留のまま待つ**。取り込みを、1回で終わる処理として設計しない。
+
+#### メモから評価へ、直接つながる経路は作らない
+
+画面から入るのはこのテーブルまでで、**`memos` に入れても評価は変わらない**。`*_notes` を
+更新するかどうかは、読んだうえで決める（[agent-design.md](agent-design.md#メモの取り込み2026-08-22-決定)）。
+`entry_comments` と同じ形にあたる。
+
+**画面に書き込みを作らないという決定を、ここで一度だけ緩めている。** 緩めたのは材料の
+受け皿までで、評価そのものを画面から直せるようにはしない（[product.md](product.md#画面)）。
+
+---
+
 ## 予想
 
 ### `marks`
@@ -776,6 +824,7 @@ TypeScript から使う写しは [lib/enums/](../lib/enums/) にある。**正�
 | `sex` | 牡 / 牝 / セン | `horses` |
 | `affiliation` | 美浦 / 栗東 / 地方 / 外国 | `jockeys` `trainers` |
 | `status` | 出走 / 取消 / 除外 / 中止 / 失格 | `entries` |
+| `status` | 未処理 / 取り込み済み / 見送り / 保留 | `memos` |
 | `author` | AI / 人間 / 対話（`race_predictions` は AI / 対話 のみ） | 評価8テーブル、`entry_comments`、`race_predictions`、`race_prediction_conditions` |
 | `race_phase` | レース前 / レース後 | `entry_comments` |
 | `speaker_role` | 騎手 / 調教師 / 調教助手 / 厩務員 / 馬主 / 生産者 / その他 | `entry_comments` |

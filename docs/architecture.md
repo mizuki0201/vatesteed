@@ -225,9 +225,13 @@ Neon をプロジェクトに接続する際の Environments は **Development /
 意図どおりで、「DBインスタンスは1つ。テーブルで分ける」という方針とも一致する。
 
 **将来見直すトリガー:** ブランチを切って PR を出すようになり、かつアプリ側に書き込み経路が
-できたとき（構想にある `(private)` のナレッジ入力画面が該当）。その Preview デプロイの書き込みが
-本番データに入る。そのときは Preview ブランチングを有効にするか、Environments から Preview を
-外すかを選ぶ。
+あるとき。その Preview デプロイの書き込みが本番データに入る。そのときは Preview ブランチングを
+有効にするか、Environments から Preview を外すかを選ぶ。
+
+**2つのうち、書き込み経路の側は 2026-08-22 に当たった。** `/dashboard/record-memo` から
+[`memos`](data-model.md#memos) に入る（[product.md の画面](product.md#画面)）。**まだ見直さないのは、
+main へ直接コミットしていて Preview デプロイが発生しないため。** PR を出すようになった時点で、
+この判断は期限切れになる。
 
 **注意:** `vercel env pull .env.local` を実行すると、本番DBの接続情報が平文でローカルに置かれる。
 `.env*` は `.gitignore` 済みだが、ファイル自体は本番の鍵として扱う。

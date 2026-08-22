@@ -1,6 +1,8 @@
+import Link from "next/link";
 import type { Metadata } from "next";
-import { PageShell, Section } from "@/components/screens/page-shell";
+import { Card, PageShell, Section } from "@/components/screens/page-shell";
 import { assertCan, listCapabilities } from "@/lib/access";
+import { countPendingMemos } from "@/lib/memos";
 
 export const metadata: Metadata = { title: "ダッシュボード — Vatesteed" };
 
@@ -26,15 +28,31 @@ const SCREENS: readonly { readonly url: string; readonly what: string }[] = [
   { url: "/courses", what: "コースの一覧と詳細" },
   { url: "/notes", what: "評価の横断一覧" },
   { url: "/dashboard", what: "ダッシュボード" },
+  { url: "/dashboard/record-memo", what: "外で見かけた話の入稿と、取り込み待ちの一覧" },
 ];
 
 export default async function Page() {
   await assertCan("dashboard");
 
   const capabilities = listCapabilities();
+  const pendingMemos = await countPendingMemos();
 
   return (
     <PageShell title="ダッシュボード">
+      <Section note="管理者だけが使うものは、この下にまとめる" title="やること">
+        <Link href="/dashboard/record-memo">
+          <Card className="transition-colors hover:border-foreground/30">
+            <p className="font-semibold tracking-tight">メモを残す</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              外で見かけた話を1つ置く。裏取りと行き先は、あとの対話で決める
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {pendingMemos === 0 ? "取り込み待ちは無い" : `取り込み待ち ${pendingMemos} 件`}
+            </p>
+          </Card>
+        </Link>
+      </Section>
+
       <Section
         note="この表を1行変えれば公開範囲が変わる。URL は変わらない"
         title="誰に何を見せているか"

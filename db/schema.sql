@@ -14,6 +14,7 @@
 --   0008_horses_retired_at.sql
 --   0009_entry_comments.sql
 --   0010_race_laps_and_prediction_conditions.sql
+--   0011_memos.sql
 --   0011_notes_no_internal_terms.sql
 
 -- ---------------------------------------------------------------------------
@@ -247,6 +248,21 @@ CREATE TABLE marks (
   CONSTRAINT marks_name_key UNIQUE (name),
   CONSTRAINT marks_sort_order_key UNIQUE (sort_order),
   CONSTRAINT marks_symbol_key UNIQUE (symbol)
+);
+
+CREATE TABLE memos (
+  id           bigserial                NOT NULL,
+  body         text                     NOT NULL,
+  source       text,
+  status       text                     NOT NULL DEFAULT '未処理'::text,
+  verification text,
+  outcome      text,
+  created_at   timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at   timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT memos_pkey PRIMARY KEY (id),
+  CONSTRAINT memos_body_length CHECK ((char_length(body) <= 400)),
+  CONSTRAINT memos_body_not_blank CHECK ((btrim(body) <> ''::text)),
+  CONSTRAINT memos_status_check CHECK ((status = ANY (ARRAY['未処理'::text, '取り込み済み'::text, '見送り'::text, '保留'::text])))
 );
 
 CREATE TABLE my_bet_legs (
@@ -514,6 +530,7 @@ CREATE INDEX horses_name_idx ON public.horses USING btree (name);
 CREATE INDEX horses_sire_id_idx ON public.horses USING btree (sire_id);
 CREATE INDEX horses_trainer_id_idx ON public.horses USING btree (trainer_id);
 CREATE INDEX jockeys_name_idx ON public.jockeys USING btree (name);
+CREATE INDEX memos_status_idx ON public.memos USING btree (status, created_at);
 CREATE INDEX my_bets_race_id_idx ON public.my_bets USING btree (race_id);
 CREATE INDEX race_payouts_race_id_idx ON public.race_payouts USING btree (race_id);
 CREATE INDEX races_course_id_idx ON public.races USING btree (course_id);
@@ -536,6 +553,7 @@ CREATE TRIGGER horses_set_updated_at BEFORE UPDATE ON public.horses FOR EACH ROW
 CREATE TRIGGER jockey_notes_set_updated_at BEFORE UPDATE ON public.jockey_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER jockeys_set_updated_at BEFORE UPDATE ON public.jockeys FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER marks_set_updated_at BEFORE UPDATE ON public.marks FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER memos_set_updated_at BEFORE UPDATE ON public.memos FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER my_bets_set_updated_at BEFORE UPDATE ON public.my_bets FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER my_predictions_set_updated_at BEFORE UPDATE ON public.my_predictions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER pedigree_notes_set_updated_at BEFORE UPDATE ON public.pedigree_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();

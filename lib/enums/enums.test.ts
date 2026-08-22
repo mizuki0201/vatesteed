@@ -12,6 +12,7 @@ import {
   ENTRY_STATUSES,
   GRADES,
   GRANT_SOURCES,
+  MEMO_STATUSES,
   NOTE_AUTHORS,
   PAYOUT_TICKET_TYPES,
   RACE_PREDICTION_AUTHORS,
@@ -103,6 +104,8 @@ const EXPECTED: Record<string, readonly string[]> = {
   "entry_comments.author": NOTE_AUTHORS,
   "entry_comments.race_phase": COMMENT_RACE_PHASES,
   "entry_comments.speaker_role": COMMENT_SPEAKER_ROLES,
+  // メモは評価ではないので author を持たない。縛るのは取り込みの状況だけ
+  "memos.status": MEMO_STATUSES,
   "race_predictions.author": RACE_PREDICTION_AUTHORS,
   // 予想時点の前提は、人間だけが書くこともある（馬場を見た話が人間の側にしか無い場合）
   "race_prediction_conditions.author": NOTE_AUTHORS,

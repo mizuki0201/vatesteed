@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { buildAgentMarkdown, extractDescription, needsPhase1DbAccess } from "./claude-agents.ts";
+import { buildAgentMarkdown, extractDescription, extractModel, needsPhase1DbAccess } from "./claude-agents.ts";
 
 /**
  * `agent/subagents/` から `.claude/agents/` を生成し直す。
@@ -67,9 +67,12 @@ export async function syncClaudeAgents(): Promise<SyncResult> {
       continue;
     }
 
+    const model = extractModel(agentSource);
+
     const markdown = buildAgentMarkdown({
       id,
       description,
+      model,
       body,
       appendix: needsPhase1DbAccess(id) ? phase1DbAccess : undefined,
     });

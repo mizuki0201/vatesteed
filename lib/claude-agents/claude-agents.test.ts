@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   buildAgentMarkdown,
   extractDescription,
+  extractModel,
   needsPhase1DbAccess,
   quoteYamlString,
 } from "./claude-agents.ts";
@@ -43,10 +44,17 @@ test("description が無ければ undefined", () => {
   assert.equal(extractDescription('export default defineAgent({ model: "x" });'), undefined);
 });
 
+test("agent.ts のソースから model を取り出す", () => {
+  const source = 'export default defineAgent({ model: "anthropic/claude-opus-5" });';
+
+  assert.equal(extractModel(source), "anthropic/claude-opus-5");
+});
+
 test("frontmatter と本文を組み立てる", () => {
   const markdown = buildAgentMarkdown({
     id: "horse-analyst",
     description: "馬を読む",
+    model: "anthropic/claude-opus-5",
     body: "# 馬を読む役\n\n本文。\n",
   });
 
@@ -58,6 +66,7 @@ test("frontmatter と本文を組み立てる", () => {
       "# 正本は agent/subagents/horse-analyst/",
       "name: horse-analyst",
       'description: "馬を読む"',
+      "model: claude-opus-5",
       "---",
       "",
       "# 馬を読む役",

@@ -3,6 +3,7 @@
 # 正本は agent/subagents/dev-web-platform/
 name: dev-web-platform
 description: "Vatesteed 自体の開発で、Next.js・Vercel・shadcn の仕様を調べて答えを出すときに使う。競馬の分析には使わない。ファイルは書かず、根拠を添えた答えを返す。"
+model: claude-opus-5
 ---
 
 # 画面と配信の専門家（Next.js / Vercel / shadcn）

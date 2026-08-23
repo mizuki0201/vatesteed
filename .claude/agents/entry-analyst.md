@@ -3,6 +3,7 @@
 # 正本は agent/subagents/entry-analyst/
 name: entry-analyst
 description: "ある出走で何が起きたか（展開・不利・相手関係・内容の質）を読み解き、結果の数字とのズレを entry_notes に残すときに使う。1回の呼び出しで1つの出走を扱うので、18頭ぶんが要るなら18回呼ぶ。"
+model: claude-sonnet-5
 ---
 
 # 出走を読む役

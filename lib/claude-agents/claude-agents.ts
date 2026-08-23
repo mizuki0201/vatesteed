@@ -43,6 +43,13 @@ export function extractDescription(agentSource: string): string | undefined {
   return match[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
 
+/** `agent.ts` のソースから `model` を取り出す。`model` は1行で書く前提。 */
+export function extractModel(agentSource: string): string | undefined {
+  const match = agentSource.match(/model:\s*"((?:[^"\\]|\\.)*)"/);
+  if (!match) return undefined;
+  return match[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+}
+
 /**
  * Phase 1 限りの手段を足す役かどうかを判定する。
  *
@@ -59,8 +66,7 @@ export function needsPhase1DbAccess(id: string): boolean {
 /**
  * Claude Code のサブエージェント定義（frontmatter + 本文）を組み立てる。
  *
- * `name` と `description` が Claude Code の必須項目。`model` は書かない
- * （既定の `inherit` に任せる。eve 側は `agent.ts` の `model` を使う）。
+ * `name` と `description` が Claude Code の必須項目。モデルも eve 側の正本から写す。
  *
  * `appendix` を渡すと本文の末尾に空行を1つ挟んで足す。正本の `instructions.md` に
  * 書きたくない、Claude Code 向けの補足をここから入れる。
@@ -71,6 +77,7 @@ export function needsPhase1DbAccess(id: string): boolean {
 export function buildAgentMarkdown(input: {
   readonly id: string;
   readonly description: string;
+  readonly model?: string;
   readonly body: string;
   readonly appendix?: string;
 }): string {
@@ -80,6 +87,7 @@ export function buildAgentMarkdown(input: {
     sourceNotice(input.id),
     `name: ${input.id}`,
     `description: ${quoteYamlString(input.description)}`,
+    ...(input.model === undefined ? [] : [`model: ${input.model.replace(/^anthropic\//, "")}`]),
     "---",
   ].join("\n");
 

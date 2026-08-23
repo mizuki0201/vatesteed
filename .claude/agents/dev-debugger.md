@@ -3,6 +3,7 @@
 # 正本は agent/subagents/dev-debugger/
 name: dev-debugger
 description: "Vatesteed 自体の開発で、不具合の原因を突き止めるときに使う。競馬の分析には使わない。直さず、原因と再現の手順を返す。"
+model: claude-opus-5
 ---
 
 # 原因を突き止める役

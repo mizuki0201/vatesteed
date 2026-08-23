@@ -410,7 +410,7 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 | `/horses` `/horses/[id]` | 馬の一覧と詳細（評価と出走の履歴）。すべて・現役・引退をセグメントコントロールで切り替えられる | friend |
 | `/jockeys` `/jockeys/[id]` | 騎手の一覧と詳細 | friend |
 | `/trainers` `/trainers/[id]` | 厩舎の一覧と詳細 | friend |
-| `/courses` `/courses/[id]` | コースの一覧と詳細 | friend |
+| `/courses` `/courses/[id]` | 見立てがあるコースの一覧と詳細 | friend |
 | `/results/mine` | 自分の成績と収支。購入日で期間を絞り込める | friend |
 | `/notes` | 最新の分析結果。7種類の評価を更新日順に | owner |
 | `/dashboard` | ダッシュボード。誰にどこを見せているかの一覧 | owner |

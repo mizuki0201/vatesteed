@@ -22,7 +22,7 @@ export default async function Page({
     >
       {courses.length === 0 ? (
         <Empty>
-          {q ? `「${q}」に当たるコースはありません。` : "まだコースが登録されていません。"}
+          {q ? `「${q}」に当たるコースはありません。` : "まだ見立てがあるコースはありません。"}
         </Empty>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">

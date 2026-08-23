@@ -52,7 +52,8 @@ export async function listCourses(options: { readonly q?: string } = {}): Promis
             (SELECT count(*) FROM races r WHERE r.course_id = c.id) AS race_count,
             EXISTS (SELECT 1 FROM course_notes n WHERE n.course_id = c.id) AS has_note
        FROM courses c
-      WHERE $1::text IS NULL OR c.track ILIKE '%' || $1 || '%'
+      WHERE EXISTS (SELECT 1 FROM course_notes n WHERE n.course_id = c.id)
+        AND ($1::text IS NULL OR c.track ILIKE '%' || $1 || '%')
       ORDER BY c.track, c.surface, c.distance_m`,
     [q || null],
   );

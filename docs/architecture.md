@@ -2,10 +2,12 @@
 
 ## 全体構成
 
-- **eve の構成でプロジェクトを作る**が、Phase 1 で動かすエンジンは **Claude Code**
+- **eve の構成でプロジェクトを作る**が、Phase 1 では Codex が人間との対話・外部情報の収集・
+  文章確認、Claude Code が登録・分析・予想を担う形をまず試す。**この配置は暫定であり固定しない**。
+  役の定義を変えず、どちらか単体や逆の配置も試せる
 - `CLAUDE.md` をブリッジファイルとして配置し、指示の実体は `AGENTS.md` に置く
 - **ツールロジックは `lib/` に置き、`agent/tools/` はそれを呼ぶ薄いラッパーにする**
-  - Phase 1 では Claude Code が `lib/` を直接叩くので、eve ランタイムは起動しない
+  - Phase 1 では実行を担うエージェントが `lib/` を直接呼ぶので、eve ランタイムは起動しない
     → サブスク内に収まる
   - Phase 3 で eve に載せる際、`agent/tools/` のラッパーを書くだけで移行できる
 - **Next.js を同居させてダッシュボードを作る**（`app/` 配下）
@@ -215,8 +217,8 @@ Neon をプロジェクトに接続する際の Environments は **Development /
 3つすべて**を有効にしている。
 
 - **Development は必須。** `vercel env pull .env.local` が既定で引くのはこの環境。ここが無いと
-  `DATABASE_URL` がローカルに落ちてこず、Phase 1 の「手元の Claude Code が `lib/` 経由で DB を
-  触る」が成立しない
+  `DATABASE_URL` がローカルに落ちてこず、Phase 1 の実行を担うエージェントが `lib/` 経由で DB を
+  触れない
 - **Production は必須。** デプロイしたダッシュボードが DB を読めなくなる
 - **Preview は現時点では使われない。** main へ直接コミットしているため Preview デプロイが発生
   しない

@@ -17,7 +17,7 @@ const STACK: readonly { readonly label: string; readonly value: string; readonly
   {
     label: "エージェント",
     value: "eve",
-    note: "Phase 1 では起動せず、Claude Code をエンジンとして使っている",
+    note: "Phase 1 では起動せず、選んだ実行元を直接使う",
   },
   { label: "Web", value: "Next.js 16（App Router）", note: "画面はすべてサーバー側で描く" },
   { label: "UI", value: "Tailwind CSS 4 / shadcn", note: "画面には JavaScript をほぼ置かない" },

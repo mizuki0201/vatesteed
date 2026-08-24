@@ -2,7 +2,7 @@
  * eve の `agent/subagents/<id>/` から、Claude Code が読む `.claude/agents/<id>.md` を
  * 組み立てる。
  *
- * Phase 1 のエンジンは Claude Code だが、役の実体は eve の規約どおり
+ * Claude Code で役を実行する場合も、役の実体は eve の規約どおり
  * `agent/subagents/` に置いている。Claude Code が読むのは `.claude/agents/` 配下の
  * markdown なので、そこへ写す必要がある。手で両方に書くと必ずズレるため、
  * eve 側だけを正本にして機械的に写す。

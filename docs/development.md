@@ -118,20 +118,22 @@ Claude Code で役を実行する場合は、役の正本を変えたらこの�
 Codex タスク経由で Claude Code を呼ぶ場合は、更新前の役定義を持っていることがあるため、
 新しいタスクで確認する。
 
-## 現在の実行方法（暫定）
+## 開発時の実行方法（暫定）
 
-現在は、Codex を進行役、Claude Code を `dev-implementer` の実行元として使う。これは役の定義では
-なく、今の接続方法で試している割り当てである。Codex 単体、Claude Code 単体、Claude Code から
-Codex への依頼などを試すときは、この節の実行方法だけを変え、上の役と受け渡しの規則はそのまま使う。
+この節は**Vatesteed 自体を作る依頼だけ**に適用する。現在は、Codex を進行役、Claude Code を
+`dev-implementer` の実行元として使う。これは役の定義ではなく、開発時に試している割り当てである。
+競馬について対話する依頼で分析する役を使うこと、Codex 単体・Claude Code 単体・Claude Code から
+Codex へ依頼することを制限しない。実行元は、その依頼と必要な役に合わせて選ぶ。
 
 この配置では、Codex が docs と実装依頼を渡し、Claude Code がコード変更と完了報告を返す。Codex は
 差分とテスト結果を確認して受け入れを判断する。
 
-### Codex から Claude Code を呼ぶ接続確認
+### Codex から Claude Code を呼ぶ開発時の接続確認
 
 実装依頼を送る前に、新しい Codex タスクでファイル操作をしない短い呼び出しを行う。
 `claude_code.Agent` が使え、`subagent_type: "dev-implementer"` と
-`run_in_background: false` を受け付けることを確かめる。
+`run_in_background: false` を受け付けることを確かめる。これは開発役を呼ぶ確認であり、
+MCP が開発役だけを受け付けるという意味ではない。
 
 Claude の利用上限エラーが返る場合は、Vatesteed 専用の Keychain 認証までは到達している。
 一方、`Agent type 'dev-implementer' not found` のように役の定義を見つけられない場合は、

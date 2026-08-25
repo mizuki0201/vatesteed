@@ -15,8 +15,13 @@ describe("can", () => {
 
   it("足りなければ見られない", () => {
     assert.equal(can("member", "horses"), false);
-    assert.equal(can("friend", "notes.raw"), false);
+    assert.equal(can("friend", "memos"), false);
     assert.equal(can("public", "races"), false);
+  });
+
+  it("friend は蓄積の横断一覧を見られるが、member は見られない", () => {
+    assert.equal(can("friend", "notes.raw"), true);
+    assert.equal(can("member", "notes.raw"), false);
   });
 
   it("public のものは誰でも見られる", () => {
@@ -37,6 +42,7 @@ describe("requiredLevel", () => {
   it("表に書いたレベルを返す", () => {
     assert.equal(requiredLevel("races"), "member");
     assert.equal(requiredLevel("results.mine"), "friend");
+    assert.equal(requiredLevel("notes.raw"), "friend");
     assert.equal(requiredLevel("dashboard"), "owner");
   });
 });

@@ -1,6 +1,15 @@
 # Codex から Claude Code を呼ぶ
 
-Phase 1 では、Codex が人との対話を担い、Claude Code が登録・分析・予想・振り返りを実行する。ここでは、Codex からこのリポジトリの Claude Code を呼ぶ方法を定める。
+Phase 1 では、Codex が人との対話と進行を担い、Claude Code が実行を担う。ここでは、Codex から
+このリポジトリの Claude Code を呼ぶ方法を定める。
+
+**本人から実行元について明示の指示が無い限り、これが既定の体制である。** 競馬について対話する
+依頼では Claude Code が登録・分析・予想・振り返りを実行し、Vatesteed 自体を作る依頼では
+Claude Code を `dev-implementer` の実行元として使う（開発時の配置は
+[development.md の「開発時の実行方法（暫定）」](development.md#開発時の実行方法暫定)が正本）。
+Codex は変更の規模や単純さを理由にこの既定を省かない。本人が Codex 単体などを明示したときは、
+その指示が優先される。この配置は現在試している運用であり、変えるときはこの文書と
+[development.md](development.md) を先に更新する。
 
 ## モデル
 
@@ -32,13 +41,15 @@ Claude Code の役定義もすべて `anthropic/claude-opus-5` に固定する�
 
 ## 新しい Codex タスクでの接続確認
 
-新しい Codex タスクで Claude Code を初めて使う前に、ファイル操作をしない最小呼び出しを1回行う。
+既定の体制で進める新しい Codex タスクでは、docs やコードを変更する前に、ファイル操作をしない
+最小呼び出しを1回行う。接続確認は本来の依頼の前段であって、依頼の一部を先に実装してから行う
+ものではない。
 
 ```sh
 pnpm claude:opus -- "Return exactly: AUTH_OK"
 ```
 
-Codex の実行環境では Anthropic API へのネットワーク接続を許可して実行する。`AUTH_OK` と `claude-opus-5` を確認できたら、そのタスクで本来の依頼を実行してよい。`claude auth status` はこのプロジェクトのローカル設定を使った実行可否の確認には使わない。
+Codex の実行環境では Anthropic API へのネットワーク接続を許可して実行する。`AUTH_OK` と `claude-opus-5` を確認できたら、そのタスクで本来の依頼を実行してよい。確認できないうちは docs もコードも変更しない。`claude auth status` はこのプロジェクトのローカル設定を使った実行可否の確認には使わない。
 
 ## 失敗時
 

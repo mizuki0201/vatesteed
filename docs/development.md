@@ -120,10 +120,14 @@ Codex タスク経由で Claude Code を呼ぶ場合は、更新前の役定義�
 
 ## 開発時の実行方法（暫定）
 
-この節は**Vatesteed 自体を作る依頼だけ**に適用する。現在は、Codex を進行役、Claude Code を
-`dev-implementer` の実行元として使う。これは役の定義ではなく、開発時に試している割り当てである。
-競馬について対話する依頼で分析する役を使うこと、Codex 単体・Claude Code 単体・Claude Code から
-Codex へ依頼することを制限しない。実行元は、その依頼と必要な役に合わせて選ぶ。
+この節は**Vatesteed 自体を作る依頼だけ**に適用する。**本人から実行元について明示の指示が無い
+限り、Codex を進行役、Claude Code を `dev-implementer` の実行元として使う。** 変更の規模や
+単純さを理由に Codex 単体へ切り替えない。Codex は要件整理、docs の正本化、実装依頼、受け入れを
+担い、Claude Code はコード変更と完了報告を担う。
+
+本人が Codex 単体で完結するよう明示したときなどは、その指示に従う。この配置は役の定義ではなく、
+現在試している実行体制であり、運用が変わればこの節を更新する。競馬について対話する依頼で分析する役を
+使う際の既定は [claude-code-bridge.md](claude-code-bridge.md) を参照する。
 
 この配置では、Codex が docs と実装依頼を渡し、Claude Code がコード変更と完了報告を返す。Codex は
 差分とテスト結果を確認して受け入れを判断する。
@@ -131,7 +135,7 @@ Codex へ依頼することを制限しない。実行元は、その依頼と�
 ### Codex から Claude Code を呼ぶ開発時の接続確認
 
 開発時も、[Codex から Claude Code を呼ぶ](claude-code-bridge.md) の手順を使う。新しい Codex タスクでは、
-実装依頼を送る前にファイル操作をしない最小の接続確認を1回行う。認証はこのリポジトリの
+docs やコードを変更する前にファイル操作をしない最小の接続確認を1回行う。認証はこのリポジトリの
 `.claude/settings.local.json` に閉じ、呼び出しは `pnpm claude:opus` で Opus に固定する。
 
 接続確認で Opus と認証が確認できなければ実装を始めない。失敗時に Keychain、API キー、既定モデルへ

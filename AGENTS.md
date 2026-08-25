@@ -57,13 +57,28 @@ AI に寄せる候補。
 
 Phase 1 では eve ランタイムを起動しない。実行を担うエージェントが `lib/` を直接呼ぶ。
 
-## Codex から Claude Code を呼ぶ
+## 実行元の既定（Codex から Claude Code を呼ぶ）
+
+**本人から実行元について明示の指示が無い限り、Codex が進行役になり、実行は Claude Code を呼んで
+行う。** これが既定の体制で、依頼の種類によって使う役が変わる。
+
+- **Vatesteed 自体を作る依頼**では、Claude Code を `dev-implementer` の実行元として使う。Codex は
+  要件整理・docs の正本化・実装依頼・差分レビュー・受け入れを担い、コード変更は Claude Code が行う
+- **競馬について対話する依頼**でも、分析を実行するのは Claude Code の適切な役（`entry-analyst` ほか）
+  とする
+- **Codex は変更の規模や単純さを理由に、この既定を省いて単独で実装しない。** 1行の修正でも既定は
+  変わらない
+- **本人の明示の指示が既定より優先される。** 「Codex だけでやって」のように実行元を指定された
+  ときは、その指示に従う
+- これは現在の運用であって、固定した決まりではない。将来変更する可能性があり、変えるときは正本の
+  docs（[docs/development.md](docs/development.md) と
+  [docs/claude-code-bridge.md](docs/claude-code-bridge.md)）を先に更新する
 
 Phase 1 で Codex から Claude Code を使うときは、必ず [docs/claude-code-bridge.md](docs/claude-code-bridge.md) に従う。
 
 - 実行は `pnpm claude:opus -- "依頼文"` だけを使う。直接 `claude -p` を実行したり、既定モデルや別のモデルへ切り替えたりしない
 - 認証は gitignore 済みの `.claude/settings.local.json` にある、このリポジトリ限定の OAuth トークンを使う。トークンの値を読んだり、書き換えたり、会話やログへ出したりしない
-- 新しい Codex タスクでは、最初にネットワーク接続を許可した最小の接続確認を1回行い、`AUTH_OK` と `claude-opus-5` を確認してから本来の依頼へ進む
+- 既定の体制で進める新しい Codex タスクでは、docs やコードを変更する前に、ネットワーク接続を許可した最小の接続確認を1回行い、`AUTH_OK` と `claude-opus-5` を確認してから本来の依頼へ進む
 - 接続に失敗しても、Keychain の再登録、API キーへの切り替え、別モデルへの切り替えをしない。失敗の分類と対応は上の正本に従う
 
 ## 2つのモード
@@ -75,6 +90,9 @@ Phase 1 で Codex から Claude Code を使うときは、必ず [docs/claude-co
 | --- | --- | --- |
 | **競馬について対話する**（予想・振り返り・馬や騎手についての問い） | [docs/product.md](docs/product.md) | 分析する役（`entry-analyst` ほか） |
 | **Vatesteed 自体を作る**（機能開発・不具合改修） | [docs/development.md](docs/development.md) | 開発の役（`dev-` で始まるもの） |
+
+**どちらのモードでも、これらの役を実行するのは Claude Code が既定である。** 実行元の決め方は
+[実行元の既定](#実行元の既定codex-から-claude-code-を呼ぶ)に従う。
 
 **開発モードに入るときは、着手する前に次の3つを読む。**
 

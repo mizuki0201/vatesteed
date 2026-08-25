@@ -1,7 +1,13 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { buildAgentMarkdown, extractDescription, extractModel, needsPhase1DbAccess } from "./claude-agents.ts";
+import {
+  buildAgentMarkdown,
+  extractDescription,
+  extractModel,
+  isClaudeOpusModel,
+  needsPhase1DbAccess,
+} from "./claude-agents.ts";
 
 /**
  * `agent/subagents/` から `.claude/agents/` を生成し直す。
@@ -68,6 +74,10 @@ export async function syncClaudeAgents(): Promise<SyncResult> {
     }
 
     const model = extractModel(agentSource);
+
+    if (!isClaudeOpusModel(model)) {
+      throw new Error(`${id} の model は anthropic/claude-opus-5 でなければなりません。`);
+    }
 
     const markdown = buildAgentMarkdown({
       id,

@@ -14,6 +14,9 @@
 const GENERATED_NOTICE =
   "# このファイルは自動生成される。手で編集しても pnpm gen:agents で上書きされる。";
 
+/** Phase 1 で Claude Code に渡す役はすべてこのモデルを使う。 */
+export const CLAUDE_OPUS_MODEL = "anthropic/claude-opus-5";
+
 /** 正本の場所を生成物に書き添えるための文言を作る。 */
 function sourceNotice(id: string): string {
   return `# 正本は agent/subagents/${id}/`;
@@ -48,6 +51,11 @@ export function extractModel(agentSource: string): string | undefined {
   const match = agentSource.match(/model:\s*"((?:[^"\\]|\\.)*)"/);
   if (!match) return undefined;
   return match[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+}
+
+/** Claude Code の生成対象に許可するモデルかを判定する。 */
+export function isClaudeOpusModel(model: string | undefined): boolean {
+  return model === CLAUDE_OPUS_MODEL;
 }
 
 /**

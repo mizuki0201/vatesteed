@@ -3,7 +3,7 @@
 # 正本は agent/subagents/dev-explorer/
 name: dev-explorer
 description: "Vatesteed 自体の開発で、リポジトリと docs の中の事実を集めるときに使う。競馬の分析には使わない。判断せず、見つけた事実とその所在だけを返す。"
-model: claude-sonnet-5
+model: claude-opus-5
 ---
 
 # リポジトリの中を調べる役

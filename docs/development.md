@@ -130,19 +130,12 @@ Codex へ依頼することを制限しない。実行元は、その依頼と�
 
 ### Codex から Claude Code を呼ぶ開発時の接続確認
 
-実装依頼を送る前に、新しい Codex タスクでファイル操作をしない短い呼び出しを行う。
-`claude_code.Agent` が使え、`subagent_type: "dev-implementer"` と
-`run_in_background: false` を受け付けることを確かめる。これは開発役を呼ぶ確認であり、
-MCP が開発役だけを受け付けるという意味ではない。
+開発時も、[Codex から Claude Code を呼ぶ](claude-code-bridge.md) の手順を使う。新しい Codex タスクでは、
+実装依頼を送る前にファイル操作をしない最小の接続確認を1回行う。認証はこのリポジトリの
+`.claude/settings.local.json` に閉じ、呼び出しは `pnpm claude:opus` で Opus に固定する。
 
-Claude の利用上限エラーが返る場合は、Vatesteed 専用の Keychain 認証までは到達している。
-一方、`Agent type 'dev-implementer' not found` のように役の定義を見つけられない場合は、
-実装を始めない。MCP と Claude Code の設定読み込み状況を報告し、呼び出せる状態を直してから
-新しい Codex タスクで再確認する。
-
-`launch-claude-mcp` は Keychain から取得した `CLAUDE_CODE_OAUTH_TOKEN` を、その呼び出しだけに
-渡す。MCP の `Agent` は、プロジェクトを作業場所にして `claude --agent <役名> -p` を同期実行する。
-この経路では `.claude/agents/` の生成物が Claude Code に読まれ、役のモデル指定も使われる。
+接続確認で Opus と認証が確認できなければ実装を始めない。失敗時に Keychain、API キー、既定モデルへ
+切り替えることはしない。
 
 ## タスク
 

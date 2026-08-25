@@ -281,7 +281,7 @@ frontmatter で持たせる必要があるが、eve は `instructions.md` を「
 生成した8つの役が Claude Code から見えることを確認済み。
 
 **確かめ方。** 対象のディレクトリで
-`claude -p "List every agent type name you can delegate to."` を実行し、役の名前が出てくるかを
+`pnpm claude:opus -- "List every agent type name you can delegate to."` を実行し、役の名前が出てくるかを
 見る。役を足したり生成の仕組みを変えたりしたときは、これで確認する。
 
 **Phase 1 と Phase 3 で違うところ。** 現在 Phase 1 で使う Claude Code のスキルはセッション共通で、

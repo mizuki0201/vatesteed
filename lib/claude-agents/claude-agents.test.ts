@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildAgentMarkdown,
+  CLAUDE_OPUS_MODEL,
   extractDescription,
   extractModel,
+  isClaudeOpusModel,
   needsPhase1DbAccess,
   quoteYamlString,
 } from "./claude-agents.ts";
@@ -48,6 +50,12 @@ test("agent.ts のソースから model を取り出す", () => {
   const source = 'export default defineAgent({ model: "anthropic/claude-opus-5" });';
 
   assert.equal(extractModel(source), "anthropic/claude-opus-5");
+});
+
+test("Opus 以外のモデルは生成対象にしない", () => {
+  assert.equal(isClaudeOpusModel(CLAUDE_OPUS_MODEL), true);
+  assert.equal(isClaudeOpusModel("anthropic/claude-sonnet-5"), false);
+  assert.equal(isClaudeOpusModel(undefined), false);
 });
 
 test("frontmatter と本文を組み立てる", () => {

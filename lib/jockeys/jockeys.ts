@@ -1,5 +1,10 @@
 import { query } from "../db/index.ts";
 import { assertCan } from "../access/index.ts";
+import {
+  DEFAULT_AFFILIATION_GROUP,
+  groupAffiliations,
+  type AffiliationGroup,
+} from "./affiliation.ts";
 
 /** 騎手の画面が読むもの。 */
 
@@ -33,22 +38,25 @@ export type JockeyRide = {
   readonly cornerPositions: string | null;
 };
 
-export async function listJockeys(options: { readonly q?: string } = {}): Promise<
-  readonly JockeySummary[]
-> {
+/** 一覧。`q` を渡すと騎手名の部分一致で絞る。所属の区分は JRA 所属を既定にする。 */
+export async function listJockeys(
+  options: { readonly q?: string; readonly group?: AffiliationGroup } = {},
+): Promise<readonly JockeySummary[]> {
   await assertCan("jockeys");
 
   const q = options.q?.trim();
+  const affiliations = groupAffiliations(options.group ?? DEFAULT_AFFILIATION_GROUP);
 
   const { rows } = await query(
     `SELECT j.id, j.name, j.affiliation,
             (SELECT count(*) FROM entries e WHERE e.jockey_id = j.id) AS ride_count,
             EXISTS (SELECT 1 FROM jockey_notes n WHERE n.jockey_id = j.id) AS has_note
        FROM jockeys j
-      WHERE $1::text IS NULL OR j.name ILIKE '%' || $1 || '%'
+      WHERE ($1::text IS NULL OR j.name ILIKE '%' || $1 || '%')
+        AND j.affiliation = ANY($2::text[])
       ORDER BY j.name
       LIMIT 200`,
-    [q || null],
+    [q || null, affiliations],
   );
 
   return rows.map((row) => ({

@@ -1,27 +1,49 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Card, Empty, PageShell } from "@/components/screens/page-shell";
+import { JockeyAffiliationSegments } from "@/components/screens/jockey-affiliation-segments";
 import { SearchForm } from "@/components/screens/search-form";
-import { listJockeys } from "@/lib/jockeys";
+import {
+  DEFAULT_AFFILIATION_GROUP,
+  affiliationGroup,
+  affiliationGroupLabel,
+  listJockeys,
+} from "@/lib/jockeys";
 
 export const metadata: Metadata = { title: "騎手 — Vatesteed" };
 
 export default async function Page({
   searchParams,
 }: {
-  readonly searchParams: Promise<{ readonly q?: string }>;
+  readonly searchParams: Promise<{ readonly q?: string; readonly group?: string }>;
 }) {
-  const { q } = await searchParams;
-  const jockeys = await listJockeys({ q });
+  const { q, group: rawGroup } = await searchParams;
+  const group = affiliationGroup(rawGroup);
+  const label = affiliationGroupLabel(group);
+  const jockeys = await listJockeys({ q, group });
 
   return (
     <PageShell
-      actions={<SearchForm action="/jockeys" defaultValue={q} placeholder="騎手名" />}
-      lead={`${jockeys.length} 人。`}
+      actions={
+        <SearchForm
+          action="/jockeys"
+          defaultValue={q}
+          keep={group === DEFAULT_AFFILIATION_GROUP ? undefined : { group }}
+          placeholder="騎手名"
+        />
+      }
       title="騎手"
     >
+      <JockeyAffiliationSegments group={group} q={q} />
+      <p className="mb-4 text-sm text-muted-foreground">
+        {label} {jockeys.length} 人
+      </p>
       {jockeys.length === 0 ? (
-        <Empty>{q ? `「${q}」に当たる騎手はいません。` : "まだ騎手が登録されていません。"}</Empty>
+        <Empty>
+          {q
+            ? `${label}に「${q}」に当たる騎手はいません。`
+            : `${label}の騎手はまだ登録されていません。`}
+        </Empty>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
           {jockeys.map((jockey) => (

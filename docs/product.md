@@ -420,7 +420,7 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 | `/races/[id]` | **レースの詳細。** 出走表・印・評価・展開の予想・買い目 | member |
 | `/results/ai` | AI の成績と回収率。購入日で期間を絞り込める | member |
 | `/horses` `/horses/[id]` | 馬の一覧と詳細（評価と出走の履歴）。すべて・現役・引退をセグメントコントロールで切り替えられる | friend |
-| `/jockeys` `/jockeys/[id]` | 騎手の一覧と詳細 | friend |
+| `/jockeys` `/jockeys/[id]` | 騎手の一覧と詳細。JRA所属・地方所属・海外をセグメントコントロールで切り替えられ、初期表示はJRA所属 | friend |
 | `/trainers` `/trainers/[id]` | 厩舎の一覧と詳細 | friend |
 | `/courses` `/courses/[id]` | 見立てがあるコースの一覧と詳細 | friend |
 | `/results/mine` | 自分の成績と収支。購入日で期間を絞り込める | friend |

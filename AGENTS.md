@@ -76,7 +76,7 @@ Phase 1 では eve ランタイムを起動しない。実行を担うエージ�
 
 Phase 1 で Codex から Claude Code を使うときは、必ず [docs/claude-code-bridge.md](docs/claude-code-bridge.md) に従う。
 
-- 実行は `pnpm claude:opus -- "依頼文"` だけを使う。直接 `claude -p` を実行したり、既定モデルや別のモデルへ切り替えたりしない
+- 新規実行は `pnpm claude:opus -- "依頼文"`、同じ実行の再開は `pnpm claude:opus -- --resume <実行記録のID> -- "続きの依頼文"` だけを使う。直接 `claude -p` を実行したり、既定モデルや別のモデルへ切り替えたりしない
 - 認証は gitignore 済みの `.claude/settings.local.json` にある、このリポジトリ限定の OAuth トークンを使う。トークンの値を読んだり、書き換えたり、会話やログへ出したりしない
 - 既定の体制で進める新しい Codex タスクでは、docs やコードを変更する前に、ネットワーク接続を許可した最小の接続確認を1回行い、`AUTH_OK` と `claude-opus-5` を確認してから本来の依頼へ進む
 - 接続に失敗しても、Keychain の再登録、API キーへの切り替え、別モデルへの切り替えをしない。失敗の分類と対応は上の正本に従う

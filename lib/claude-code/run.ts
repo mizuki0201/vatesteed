@@ -10,11 +10,13 @@ import {
   CLAUDE_CHILD_ENV,
   type ClaudeCommand,
 } from "./claude-opus.ts";
-import { checkClaudeResult } from "./result.ts";
+import { checkClaudeResult, sessionIdFromClaudeOutput } from "./result.ts";
 import {
   type ClaudeRunRecord,
   createRunId,
+  findRunRecordsForTask,
   loadRunRecord,
+  markRunIncomplete,
   resumableSessionId,
   saveRunRecord,
 } from "./run-record.ts";
@@ -29,6 +31,8 @@ export type ClaudeProcessOutcome = {
 export type ClaudeProcessInput = {
   args: string[];
   env: Record<string, string | undefined>;
+  /** stream-jsonを受け取るたびに呼ぶ。セッションIDを終了前に保存するために使う。 */
+  onStdoutChunk?: (chunk: string) => Promise<void>;
 };
 
 export type ClaudeProcessRunner = (input: ClaudeProcessInput) => Promise<ClaudeProcessOutcome>;
@@ -54,10 +58,28 @@ export type RunClaudeOpusOptions = {
   /** 子プロセスに渡す環境変数のもと。既定は呼び出し元の環境 */
   env?: Record<string, string | undefined>;
   now?: () => Date;
+  /** Codexの確認後に差し戻すときだけ、正常終了した同じセッションを再開可能へ戻す。 */
+  reopenCompleted?: boolean;
+  /** 本人が最初からやり直すよう明示したときだけ、同じタスクの新規実行を許す。 */
+  allowExistingTaskRun?: boolean;
 };
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function assertSameTask(previous: ClaudeRunRecord, command: ClaudeCommand): void {
+  if (command.kind !== "resume") return;
+  const pairs = [
+    ["taskPath", previous.taskPath, command.taskPath],
+    ["mode", previous.mode, command.mode],
+    ["executorRole", previous.executorRole, command.executorRole],
+  ] as const;
+  for (const [key, saved, received] of pairs) {
+    if (saved !== null && saved !== received) {
+      throw new Error(`実行記録の ${key} と指定されたタスクが一致しません。`);
+    }
+  }
 }
 
 /**
@@ -71,19 +93,69 @@ export async function runClaudeOpus({
   runProcess,
   env = process.env,
   now = () => new Date(),
+  reopenCompleted = false,
+  allowExistingTaskRun = false,
 }: RunClaudeOpusOptions): Promise<ClaudeRunOutput> {
   const startedAt = now().toISOString();
 
-  const previous =
+  if (command.kind === "new" && !allowExistingTaskRun) {
+    const [existing] = await findRunRecordsForTask(runsDir, command.taskPath);
+    if (existing !== undefined) {
+      throw new Error(
+        `タスク ${command.taskPath} には実行記録 ${existing.runId} があります。新規実行せず、同じ実行記録を再開してください。`,
+      );
+    }
+  }
+
+  let previous =
     command.kind === "resume" ? await loadRunRecord(runsDir, command.runId) : null;
+  if (previous !== null) assertSameTask(previous, command);
+  if (previous?.state === "completed" && reopenCompleted) {
+    previous = await markRunIncomplete(
+      runsDir,
+      previous.runId,
+      "タスクの完了条件を満たしていないため、同じClaude Codeセッションを再開する。",
+      now,
+    );
+  }
   const resumeSessionId = previous === null ? null : resumableSessionId(previous);
   const runId = previous === null ? createRunId(now()) : previous.runId;
 
   const args = buildClaudeOpusArgs({ prompt: command.prompt, resumeSessionId });
+  let record: ClaudeRunRecord = {
+    runId,
+    sessionId: resumeSessionId,
+    taskPath: command.taskPath,
+    mode: command.mode,
+    executorRole: command.executorRole,
+    state: "running",
+    exitCode: null,
+    terminalReason: null,
+    model: null,
+    subagentsSpawned: null,
+    error: null,
+    result: null,
+    startedAt: previous?.startedAt ?? startedAt,
+    updatedAt: now().toISOString(),
+  };
+  await saveRunRecord(runsDir, record);
+
+  let streamedStdout = "";
+  const saveStreamSessionId = async (chunk: string): Promise<void> => {
+    streamedStdout += chunk;
+    const sessionId = sessionIdFromClaudeOutput(streamedStdout);
+    if (sessionId === null || sessionId === record.sessionId) return;
+    record = { ...record, sessionId, updatedAt: now().toISOString() };
+    await saveRunRecord(runsDir, record);
+  };
 
   let outcome: ClaudeProcessOutcome;
   try {
-    outcome = await runProcess({ args, env: { ...env, ...CLAUDE_CHILD_ENV } });
+    outcome = await runProcess({
+      args,
+      env: { ...env, ...CLAUDE_CHILD_ENV },
+      onStdoutChunk: saveStreamSessionId,
+    });
   } catch (error) {
     outcome = { exitCode: null, stdout: "", stderr: messageOf(error) };
   }
@@ -97,9 +169,9 @@ export async function runClaudeOpus({
       : null;
   const ok = reason === null;
 
-  const record: ClaudeRunRecord = {
-    runId,
-    sessionId: check.sessionId ?? resumeSessionId,
+  record = {
+    ...record,
+    sessionId: check.sessionId ?? record.sessionId,
     state: ok ? "completed" : "incomplete",
     exitCode: outcome.exitCode,
     terminalReason: check.terminalReason,
@@ -107,7 +179,6 @@ export async function runClaudeOpus({
     subagentsSpawned: check.subagentsSpawned,
     error: reason,
     result: check.ok ? check.result : null,
-    startedAt: previous?.startedAt ?? startedAt,
     updatedAt: now().toISOString(),
   };
 

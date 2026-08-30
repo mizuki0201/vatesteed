@@ -10,9 +10,8 @@ test("Claude Code を Opus 指定で非対話実行する", () => {
     "--model",
     "opus",
     "--output-format",
-    "json",
-    "--max-turns",
-    "24",
+    "stream-json",
+    "--verbose",
     "AUTH_OK だけを返す",
   ]);
 });
@@ -33,8 +32,6 @@ test("再開のときは同じセッションIDを渡す", () => {
   assert.deepEqual(args.slice(args.indexOf("--resume")), [
     "--resume",
     "11111111-2222-3333-4444-555555555555",
-    "--max-turns",
-    "24",
     "続きをやる",
   ]);
 });
@@ -50,30 +47,41 @@ test("空のセッションIDでは再開しない", () => {
   );
 });
 
-test("pnpm run の区切りを除いて依頼文を受け取る", () => {
-  assert.deepEqual(parseClaudeCommand(["--", "AUTH_OK だけを返す"]), {
+test("pnpm run の区切りを除いてタスクMarkdownを受け取る", () => {
+  assert.deepEqual(parseClaudeCommand(["--", "--task", "docs/tasks/example.md"]), {
     kind: "new",
-    prompt: "AUTH_OK だけを返す",
+    taskPath: "docs/tasks/example.md",
   });
 });
 
-test("依頼文が1つでなければ実行しない", () => {
+test("依頼文の直接指定を受け取らない", () => {
   assert.throws(() => parseClaudeCommand([]), /使い方/);
-  assert.throws(() => parseClaudeCommand(["--", "1", "2"]), /使い方/);
+  assert.throws(() => parseClaudeCommand(["--", "直接の依頼文"]), /使い方/);
+});
+
+test("接続確認を専用の引数で受け取る", () => {
+  assert.deepEqual(parseClaudeCommand(["--", "--check-auth"]), { kind: "check-auth" });
+});
+
+test("明示的に最初からやり直す操作を受け取る", () => {
+  assert.deepEqual(
+    parseClaudeCommand(["--", "--restart", "--task", "docs/tasks/example.md"]),
+    { kind: "restart", taskPath: "docs/tasks/example.md" },
+  );
 });
 
 test("実行記録のIDを指定して再開を受け取る", () => {
   assert.deepEqual(
-    parseClaudeCommand(["--", "--resume", "20260828-093012-a1b2c3d4", "--", "続きをやる"]),
-    { kind: "resume", runId: "20260828-093012-a1b2c3d4", prompt: "続きをやる" },
+    parseClaudeCommand(["--", "--resume", "20260828-093012-a1b2c3d4", "--task", "docs/tasks/example.md"]),
+    { kind: "resume", runId: "20260828-093012-a1b2c3d4", taskPath: "docs/tasks/example.md" },
   );
 });
 
-test("再開の内側の区切りは省いてもよい", () => {
-  assert.deepEqual(parseClaudeCommand(["--resume", "20260828-093012-a1b2c3d4", "続きをやる"]), {
+test("再開はpnpm runの区切りを省いてもよい", () => {
+  assert.deepEqual(parseClaudeCommand(["--resume", "20260828-093012-a1b2c3d4", "--task", "docs/tasks/example.md"]), {
     kind: "resume",
     runId: "20260828-093012-a1b2c3d4",
-    prompt: "続きをやる",
+    taskPath: "docs/tasks/example.md",
   });
 });
 
@@ -87,7 +95,7 @@ test("再開の形式が合わなければ新規実行に切り替えない", ()
 
 test("実行記録のIDにファイル名として使えない値を渡さない", () => {
   assert.throws(
-    () => parseClaudeCommand(["--", "--resume", "../../etc/passwd", "--", "続きをやる"]),
+    () => parseClaudeCommand(["--", "--resume", "../../etc/passwd", "--task", "docs/tasks/example.md"]),
     /IDの形式/,
   );
 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkClaudeResult } from "./result.ts";
+import { checkClaudeResult, sessionIdFromClaudeOutput } from "./result.ts";
 
 /** 検証を通る最終結果。各テストはここから1項目だけ崩す。 */
 function successResult(overrides: Record<string, unknown> = {}): string {
@@ -25,6 +25,23 @@ test("すべての条件を満たした結果だけを完了とする", () => {
   assert.equal(check.sessionId, "11111111-2222-3333-4444-555555555555");
   assert.equal(check.model, "claude-opus-5");
   assert.equal(check.subagentsSpawned, 0);
+});
+
+test("stream-jsonの途中出力からセッションIDを読み、最後の結果を検証する", () => {
+  const stdout = [
+    JSON.stringify({ type: "system", subtype: "init", session_id: "early-session" }),
+    JSON.stringify({ type: "assistant", message: { content: [] }, session_id: "early-session" }),
+    successResult({ session_id: "early-session" }),
+  ].join("\n");
+  const check = checkClaudeResult(stdout);
+  assert.equal(check.ok, true);
+  assert.equal(check.sessionId, "early-session");
+  assert.equal(sessionIdFromClaudeOutput(stdout), "early-session");
+});
+
+test("次のJSONが受信途中でも先に届いたセッションIDを読む", () => {
+  const stdout = `${JSON.stringify({ type: "system", session_id: "early-session" })}\n{"type":"assistant"`;
+  assert.equal(sessionIdFromClaudeOutput(stdout), "early-session");
 });
 
 test("日付が付いたモデルIDも Opus 5 として通す", () => {
@@ -136,7 +153,7 @@ test("最終結果ではない JSON を成功として扱わない", () => {
   const check = checkClaudeResult(JSON.stringify({ type: "assistant", is_error: false }));
 
   assert.equal(check.ok, false);
-  assert.match(check.ok ? "" : check.reason, /最終結果ではなかった/);
+  assert.match(check.ok ? "" : check.reason, /最終結果が無かった/);
 });
 
 test("session_id が無ければ成功として扱わない", () => {

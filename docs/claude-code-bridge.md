@@ -16,24 +16,49 @@ Codex は変更の規模や単純さを理由にこの既定を省かない。�
 Claude Code の呼び出しは必ず Opus を使う。直接 `claude -p` を実行せず、リポジトリの入口だけを使う。
 
 ```sh
-pnpm claude:opus -- "Claude Code への依頼文"
+pnpm claude:opus -- --task docs/tasks/<タスク名>.md
 ```
 
-この入口は `claude -p --model opus --output-format json` に加えて、子エージェントを禁じる `--disallowedTools Agent` と往復数の上限を固定で渡す。既定モデルへのフォールバックはしない。結果の `modelUsage` に `claude-opus-5` が無ければ失敗として扱い、別のモデルで続行しない。
+この入口は `claude -p --model opus --output-format stream-json` に加えて、子エージェントを禁じる
+`--disallowedTools Agent` を渡す。依頼文をコマンドへ直接渡さず、検証済みのタスクMarkdownだけを
+渡す。既定モデルへのフォールバックはしない。結果の `modelUsage` に `claude-opus-5` が無ければ
+失敗として扱い、別のモデルで続行しない。
 
 Claude Code の役定義もすべて `anthropic/claude-opus-5` に固定する。`pnpm gen:agents` は別のモデルやモデル未指定の役を生成しない。
 
 ## 実行の単位と再開
 
-**1つの依頼は、1つの Claude Code セッションで完了させる。** 小さな確認、進捗確認、保存結果の
-確認を理由に新しいセッションを起動しない。最初の実行で得た `session_id` はローカルの
-`.claude/runs/` に実行記録として保存する。
+1つの依頼は `docs/tasks/` の1つのMarkdownとして保存し、1つのClaude Codeセッションで
+完了させる。開発と競馬の分析を同じファイルへ混ぜない。両方を含む依頼は2つのタスクへ分け、
+「参照」に依存関係を書く。
 
-- 新規実行は `pnpm claude:opus -- "依頼文"` を使う。実行記録のIDを返す
-- 中断・利用枠エラー・検証不合格の後は、`pnpm claude:opus -- --resume <実行記録のID> -- "続きの依頼文"`
-  で**同じ Claude Code セッション**を再開する
+タスクMarkdownのfrontmatterには `mode` と `executor_role` を必須で持たせる。
+
+```yaml
+mode: development # または racing
+executor_role: dev-implementer # racingではentry-analystなど
+```
+
+`development` では開発用の必須項目と `dev-` で始まる役を、`racing` では競馬用の必須項目と
+分析する役を検証する。`mode` が無い、値が不正、役がモードと合わない、必須項目が足りない場合は
+Claude Codeを起動しない。
+
+- 新規実行は `pnpm claude:opus -- --task docs/tasks/<タスク名>.md` を使う
+- 中断・利用枠エラー・検証不合格になった後は、
+  `pnpm claude:opus -- --resume <実行記録のID> --task docs/tasks/<タスク名>.md` で同じセッションを再開する
 - 実行記録が正常完了を示していない限り、新規実行で同じ依頼をやり直さない。最初からやり直すのは、
-  本人が明示したときだけ
+  本人が明示したときだけ `pnpm claude:opus -- --restart --task docs/tasks/<タスク名>.md` で行う
+- 小さな確認や進捗確認だけを理由にClaude Codeを呼ばない。CodexがタスクMarkdown、実行記録、
+  DBまたはコード差分を読む
+
+Claude Codeを起動する前に、実行記録を `running` として `.claude/runs/` へ保存する。Claude Codeが
+ストリーム出力へ `session_id` を返した時点で同じ実行記録へ追記する。呼び出し側が途中で終了しても、
+取得済みのセッションIDを失わないようにする。
+
+タスクMarkdownには作業単位ごとに、完了したこと、現在の作業、次の作業、問題点を記録する。
+検索やツール呼び出しのたびには更新しない。競馬の分析でDBを更新するときは、DBへ保存し、DBを
+読み直して確認し、その結果をMarkdownへ記載してから次へ進む。再開時はMarkdownだけを信用せず、
+DBまたはコード差分と照合する。
 
 入口は、モデルの終了コードだけを成功と見なさない。JSONの最終結果、`claude-opus-5` の使用、
 終了理由、子エージェント数を検証し、どれかが欠ければ未完了として実行記録に残す。標準出力が空、
@@ -44,8 +69,21 @@ Claude Code セッションで処理する。現在の入口は子エージェ�
 なら、依頼の実行契約、実行数の物理的な上限、完了判定を先に実装する。ツール呼び出しの同時数も2を
 超えないようにする。
 
-非対話実行には往復数の上限を付ける。上限に達した場合も、結果を捨てて新しいセッションを作らず、
-実行記録を残して同じセッションから再開する。
+根拠のない固定往復数では終了させない。完了条件を満たしたとき、本人にしか決められない事項が
+発生したとき、アクセス拒否などで継続できないとき、同じ失敗を繰り返して進展しないとき、
+DB保存またはMarkdown更新を確認できないときに終了する。終了理由と再開条件はMarkdownへ残す。
+
+## 保存先の役割
+
+| 保存先 | 保存するもの |
+| --- | --- |
+| DB | 馬、出走、血統、分析など競馬に関する成果物 |
+| `docs/tasks/<タスク名>.md` | 依頼、完了条件、調査結果の要約、現在地、次の作業、問題点、保存確認 |
+| `.claude/runs/<実行記録のID>.json` | Claude CodeのセッションID、実行状態、モード、役、タスクファイルのパス |
+
+分析専用の実行状態JSONは持たない。競馬の成果物はDBを基準にし、Markdownに完了と書かれていても
+DBで確認できなければ未完了として扱う。取得したページ本文は保存せず、必要な要約と参照元だけを
+MarkdownとDBへ残す。
 
 ## 認証
 
@@ -70,7 +108,7 @@ Claude Code セッションで処理する。現在の入口は子エージェ�
 ものではない。
 
 ```sh
-pnpm claude:opus -- "Return exactly: AUTH_OK"
+pnpm claude:opus -- --check-auth
 ```
 
 Codex の実行環境では Anthropic API へのネットワーク接続を許可して実行する。`AUTH_OK` と `claude-opus-5` を確認できたら、そのタスクで本来の依頼を実行してよい。確認できないうちは docs もコードも変更しない。`claude auth status` はこのプロジェクトのローカル設定を使った実行可否の確認には使わない。

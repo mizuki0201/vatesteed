@@ -1,14 +1,15 @@
 export {
   buildClaudeOpusArgs,
   CLAUDE_CHILD_ENV,
-  CLAUDE_MAX_TURNS,
   CLAUDE_OPUS_BASE_ARGS,
+  type ClaudeCliCommand,
   type ClaudeCommand,
   type ClaudeOpusArgsInput,
   parseClaudeCommand,
 } from "./claude-opus.ts";
 export {
   checkClaudeResult,
+  sessionIdFromClaudeOutput,
   type ClaudeResultCheck,
   REQUIRED_MODEL_ID,
 } from "./result.ts";
@@ -18,7 +19,9 @@ export {
   type ClaudeRunRecord,
   type ClaudeRunState,
   createRunId,
+  findRunRecordsForTask,
   loadRunRecord,
+  markRunIncomplete,
   parseRunRecord,
   resumableSessionId,
   runRecordPath,
@@ -32,3 +35,11 @@ export {
   runClaudeOpus,
   type RunClaudeOpusOptions,
 } from "./run.ts";
+export {
+  assertClaudeExecutableTask,
+  buildTaskPrompt,
+  loadTaskContract,
+  type TaskContract,
+  type TaskMode,
+  type TaskStatus,
+} from "./task-file.ts";

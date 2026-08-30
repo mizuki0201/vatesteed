@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { loadRunRecord, saveRunRecord } from "./run-record.ts";
+import type { ClaudeCommand } from "./claude-opus.ts";
 import {
   type ClaudeProcessInput,
   type ClaudeProcessOutcome,
@@ -33,8 +34,9 @@ function stubRunner(outcome: Partial<ClaudeProcessOutcome>): {
   const calls: ClaudeProcessInput[] = [];
   const run: ClaudeProcessRunner = async (input) => {
     calls.push(input);
-
-    return { exitCode: 0, stdout: "", stderr: "", ...outcome };
+    const result = { exitCode: 0, stdout: "", stderr: "", ...outcome };
+    await input.onStdoutChunk?.(result.stdout);
+    return result;
   };
 
   return { run, calls };
@@ -44,12 +46,33 @@ async function makeDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), "vatesteed-run-"));
 }
 
+function newCommand(prompt: string): ClaudeCommand {
+  return {
+    kind: "new",
+    prompt,
+    taskPath: "docs/tasks/example.md",
+    mode: "development",
+    executorRole: "dev-implementer",
+  };
+}
+
+function resumeCommand(runId: string, prompt: string): ClaudeCommand {
+  return {
+    kind: "resume",
+    runId,
+    prompt,
+    taskPath: "docs/tasks/example.md",
+    mode: "development",
+    executorRole: "dev-implementer",
+  };
+}
+
 test("新規実行は完了した実行記録を残す", async () => {
   const runsDir = await makeDir();
   const { run, calls } = stubRunner({ stdout: successStdout() });
 
   const output = await runClaudeOpus({
-    command: { kind: "new", prompt: "AUTH_OK だけを返す" },
+    command: newCommand("AUTH_OK だけを返す"),
     runsDir,
     runProcess: run,
     env: {},
@@ -69,7 +92,7 @@ test("子エージェントを引数で禁止し、同時実行数を2に固定�
   const { run, calls } = stubRunner({ stdout: successStdout() });
 
   await runClaudeOpus({
-    command: { kind: "new", prompt: "AUTH_OK だけを返す" },
+    command: newCommand("AUTH_OK だけを返す"),
     runsDir,
     runProcess: run,
     env: { CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: "16", PATH: "/usr/bin" },
@@ -86,7 +109,7 @@ test("子エージェントが起動した実行は未完了として残す", as
   const { run } = stubRunner({ stdout: successStdout({ subagent_stats: { spawned: 2 } }) });
 
   const output = await runClaudeOpus({
-    command: { kind: "new", prompt: "18頭ぶん手分けして読む" },
+    command: newCommand("18頭ぶん手分けして読む"),
     runsDir,
     runProcess: run,
     env: {},
@@ -103,7 +126,7 @@ test("終了コードが0でも検証に落ちれば未完了として残す", a
   const { run } = stubRunner({ exitCode: 0, stdout: "" });
 
   const output = await runClaudeOpus({
-    command: { kind: "new", prompt: "AUTH_OK だけを返す" },
+    command: newCommand("AUTH_OK だけを返す"),
     runsDir,
     runProcess: run,
     env: {},
@@ -120,7 +143,7 @@ test("検証を通っても終了コードが0でなければ未完了として�
   const { run } = stubRunner({ exitCode: 2, stdout: successStdout() });
 
   const output = await runClaudeOpus({
-    command: { kind: "new", prompt: "AUTH_OK だけを返す" },
+    command: newCommand("AUTH_OK だけを返す"),
     runsDir,
     runProcess: run,
     env: {},
@@ -137,7 +160,7 @@ test("子プロセスが起動できなくても実行記録を残す", async ()
   };
 
   const output = await runClaudeOpus({
-    command: { kind: "new", prompt: "AUTH_OK だけを返す" },
+    command: newCommand("AUTH_OK だけを返す"),
     runsDir,
     runProcess,
     env: {},
@@ -156,7 +179,7 @@ test("標準エラーの生ログは実行記録に残さない", async () => {
   });
 
   const output = await runClaudeOpus({
-    command: { kind: "new", prompt: "AUTH_OK だけを返す" },
+    command: newCommand("AUTH_OK だけを返す"),
     runsDir,
     runProcess: run,
     env: {},
@@ -172,7 +195,7 @@ test("未完了の実行記録から同じセッションを再開する", async
   const { run } = stubRunner({ stdout: successStdout() });
 
   const first = await runClaudeOpus({
-    command: { kind: "new", prompt: "続きの要る依頼" },
+    command: newCommand("続きの要る依頼"),
     runsDir,
     runProcess: (async () => ({
       exitCode: 1,
@@ -192,7 +215,7 @@ test("未完了の実行記録から同じセッションを再開する", async
   assert.equal(first.ok, false);
 
   const resumed = await runClaudeOpus({
-    command: { kind: "resume", runId: first.run.runId, prompt: "続きをやる" },
+    command: resumeCommand(first.run.runId, "続きをやる"),
     runsDir,
     runProcess: run,
     env: {},
@@ -210,6 +233,9 @@ test("再開は保存されたセッションIDを渡し、新規実行に切り
   await saveRunRecord(runsDir, {
     runId: "20260828-093012-a1b2c3d4",
     sessionId: "aaaa-bbbb",
+    taskPath: "docs/tasks/example.md",
+    mode: "development",
+    executorRole: "dev-implementer",
     state: "incomplete",
     exitCode: 1,
     terminalReason: "max_turns",
@@ -222,7 +248,7 @@ test("再開は保存されたセッションIDを渡し、新規実行に切り
   });
 
   await runClaudeOpus({
-    command: { kind: "resume", runId: "20260828-093012-a1b2c3d4", prompt: "続きをやる" },
+    command: resumeCommand("20260828-093012-a1b2c3d4", "続きをやる"),
     runsDir,
     runProcess: run,
     env: {},
@@ -231,8 +257,6 @@ test("再開は保存されたセッションIDを渡し、新規実行に切り
   assert.deepEqual(calls[0].args.slice(calls[0].args.indexOf("--resume")), [
     "--resume",
     "aaaa-bbbb",
-    "--max-turns",
-    "24",
     "続きをやる",
   ]);
 });
@@ -243,6 +267,9 @@ test("完了済みの実行記録は再開せず、新規実行にも切り替�
   await saveRunRecord(runsDir, {
     runId: "20260828-093012-a1b2c3d4",
     sessionId: "aaaa-bbbb",
+    taskPath: "docs/tasks/example.md",
+    mode: "development",
+    executorRole: "dev-implementer",
     state: "completed",
     exitCode: 0,
     terminalReason: "completed",
@@ -257,7 +284,7 @@ test("完了済みの実行記録は再開せず、新規実行にも切り替�
   await assert.rejects(
     () =>
       runClaudeOpus({
-        command: { kind: "resume", runId: "20260828-093012-a1b2c3d4", prompt: "続きをやる" },
+        command: resumeCommand("20260828-093012-a1b2c3d4", "続きをやる"),
         runsDir,
         runProcess: run,
         env: {},
@@ -267,6 +294,39 @@ test("完了済みの実行記録は再開せず、新規実行にも切り替�
   assert.equal(calls.length, 0);
 });
 
+test("Codexの確認で未完了なら正常終了した同じセッションを明示的に再開する", async () => {
+  const runsDir = await makeDir();
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+  await saveRunRecord(runsDir, {
+    runId: "20260828-093012-a1b2c3d4",
+    sessionId: "aaaa-bbbb",
+    taskPath: "docs/tasks/example.md",
+    mode: "development",
+    executorRole: "dev-implementer",
+    state: "completed",
+    exitCode: 0,
+    terminalReason: "completed",
+    model: "claude-opus-5",
+    subagentsSpawned: 0,
+    error: null,
+    result: "実装した",
+    startedAt: "2026-08-28T00:30:12.000Z",
+    updatedAt: "2026-08-28T00:35:00.000Z",
+  });
+
+  const output = await runClaudeOpus({
+    command: resumeCommand("20260828-093012-a1b2c3d4", "不足を直す"),
+    runsDir,
+    runProcess: run,
+    env: {},
+    reopenCompleted: true,
+  });
+
+  assert.equal(output.ok, true);
+  assert.equal(output.run.runId, "20260828-093012-a1b2c3d4");
+  assert.ok(calls[0].args.includes("aaaa-bbbb"));
+});
+
 test("見つからない実行記録は新規実行にならない", async () => {
   const runsDir = await makeDir();
   const { run, calls } = stubRunner({ stdout: successStdout() });
@@ -274,7 +334,7 @@ test("見つからない実行記録は新規実行にならない", async () =>
   await assert.rejects(
     () =>
       runClaudeOpus({
-        command: { kind: "resume", runId: "20260828-093012-ffffffff", prompt: "続きをやる" },
+        command: resumeCommand("20260828-093012-ffffffff", "続きをやる"),
         runsDir,
         runProcess: run,
         env: {},
@@ -282,4 +342,99 @@ test("見つからない実行記録は新規実行にならない", async () =>
     /見つかりません/,
   );
   assert.equal(calls.length, 0);
+});
+
+test("同じタスクMarkdownを新しいClaude Codeセッションでやり直さない", async () => {
+  const runsDir = await makeDir();
+  const first = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout() }).run,
+    env: {},
+  });
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await assert.rejects(
+    () => runClaudeOpus({ command: newCommand("最初からやり直す"), runsDir, runProcess: run, env: {} }),
+    new RegExp(first.run.runId),
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("本人が最初からやり直すよう明示した場合だけ新規実行を許す", async () => {
+  const runsDir = await makeDir();
+  await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout() }).run,
+    env: {},
+  });
+
+  const output = await runClaudeOpus({
+    command: newCommand("最初からやり直す"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout({ session_id: "new-session" }) }).run,
+    env: {},
+    allowExistingTaskRun: true,
+  });
+  assert.equal(output.ok, true);
+  assert.equal(output.run.sessionId, "new-session");
+});
+
+test("Claudeの終了前に実行記録とセッションIDを保存する", async () => {
+  const runsDir = await makeDir();
+  let runningStateChecked = false;
+  const init = JSON.stringify({ type: "system", subtype: "init", session_id: "early-session" });
+  const result = successStdout({ session_id: "early-session" });
+  const runProcess: ClaudeProcessRunner = async (input) => {
+    await input.onStdoutChunk?.(`${init}\n`);
+    const [file] = await readdir(runsDir);
+    const running = await loadRunRecord(runsDir, file.replace(/\.json$/, ""));
+    assert.equal(running.state, "running");
+    assert.equal(running.sessionId, "early-session");
+    runningStateChecked = true;
+    await input.onStdoutChunk?.(`${result}\n`);
+    return { exitCode: 0, stdout: `${init}\n${result}\n`, stderr: "" };
+  };
+
+  const output = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess,
+    env: {},
+  });
+
+  assert.equal(runningStateChecked, true);
+  assert.equal(output.run.sessionId, "early-session");
+  assert.equal(output.run.taskPath, "docs/tasks/example.md");
+});
+
+test("再開時に別のタスクMarkdownへ差し替えない", async () => {
+  const runsDir = await makeDir();
+  await saveRunRecord(runsDir, {
+    runId: "20260828-093012-a1b2c3d4",
+    sessionId: "aaaa-bbbb",
+    taskPath: "docs/tasks/original.md",
+    mode: "development",
+    executorRole: "dev-implementer",
+    state: "incomplete",
+    exitCode: 1,
+    terminalReason: "api_error",
+    model: "claude-opus-5",
+    subagentsSpawned: 0,
+    error: "中断した。",
+    result: null,
+    startedAt: "2026-08-28T00:30:12.000Z",
+    updatedAt: "2026-08-28T00:35:00.000Z",
+  });
+
+  await assert.rejects(
+    () => runClaudeOpus({
+      command: resumeCommand("20260828-093012-a1b2c3d4", "続きをやる"),
+      runsDir,
+      runProcess: stubRunner({ stdout: successStdout() }).run,
+      env: {},
+    }),
+    /taskPath.*一致しません/,
+  );
 });

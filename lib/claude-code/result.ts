@@ -5,7 +5,7 @@
  * 出力、別のモデル、子エージェントの起動を成功として扱わないため、ここで全部の条件を
  * 突き合わせる（docs/claude-code-bridge.md の「実行の単位と再開」）。
  *
- * 参照する項目名は `claude -p --output-format json` が返す最終結果のもの。
+ * 参照する項目名は `claude -p --output-format stream-json` が返す初期情報と最終結果のもの。
  */
 
 /** 使用を許すモデル。これ以外が返ったら続行しない。 */
@@ -66,6 +66,50 @@ const NO_FACTS: ClaudeResultFacts = {
   subagentsSpawned: null,
 };
 
+function parseOutputEvents(stdout: string): readonly Record<string, unknown>[] {
+  const trimmed = stdout.trim();
+  if (trimmed === "") return [];
+
+  try {
+    const single = JSON.parse(trimmed) as unknown;
+    if (isRecord(single)) return [single];
+  } catch {
+    // stream-jsonは1行に1つのJSONを返すので、行ごとに読む。
+  }
+
+  return trimmed.split(/\r?\n/).map((line) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      throw new Error("Claude のストリーム出力を JSON として読めなかった。");
+    }
+    if (!isRecord(parsed)) {
+      throw new Error("Claude のストリーム出力に JSON オブジェクトではない行があった。");
+    }
+    return parsed;
+  });
+}
+
+/** ストリームの途中で返されたセッションIDを取得する。 */
+export function sessionIdFromClaudeOutput(stdout: string): string | null {
+  for (const line of stdout.trim().split(/\r?\n/)) {
+    try {
+      const event = JSON.parse(line) as unknown;
+      if (
+        isRecord(event) &&
+        typeof event.session_id === "string" &&
+        event.session_id !== ""
+      ) {
+        return event.session_id;
+      }
+    } catch {
+      // 最後の行がまだ受信途中でも、前の完全な行からセッションIDを保存する。
+    }
+  }
+  return null;
+}
+
 /** 標準出力を検証する。成功条件を1つでも満たさなければ未完了として返す。 */
 export function checkClaudeResult(stdout: string): ClaudeResultCheck {
   const trimmed = stdout.trim();
@@ -73,28 +117,28 @@ export function checkClaudeResult(stdout: string): ClaudeResultCheck {
     return { ok: false, reason: "Claude の標準出力が空だった。", ...NO_FACTS };
   }
 
-  let parsed: unknown;
+  let events: readonly Record<string, unknown>[];
   try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return { ok: false, reason: "Claude の出力を JSON として読めなかった。", ...NO_FACTS };
+    events = parseOutputEvents(trimmed);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : String(error),
+      ...NO_FACTS,
+    };
   }
 
-  if (!isRecord(parsed)) {
-    return { ok: false, reason: "Claude の出力が JSON のオブジェクトではなかった。", ...NO_FACTS };
+  const parsed = [...events].reverse().find((event) => event.type === "result");
+  if (parsed === undefined) {
+    return { ok: false, reason: "Claude の出力に最終結果が無かった。", ...NO_FACTS };
   }
 
-  const sessionId =
-    typeof parsed.session_id === "string" && parsed.session_id !== "" ? parsed.session_id : null;
+  const sessionId = sessionIdFromClaudeOutput(trimmed);
   const terminalReason = typeof parsed.terminal_reason === "string" ? parsed.terminal_reason : null;
   const model = findRequiredModel(parsed.modelUsage);
   const subagentsSpawned = readSpawned(parsed.subagent_stats);
   const facts: ClaudeResultFacts = { sessionId, terminalReason, model, subagentsSpawned };
   const fail = (reason: string): ClaudeResultCheck => ({ ok: false, reason, ...facts });
-
-  if (parsed.type !== "result") {
-    return fail("Claude の出力が最終結果ではなかった。");
-  }
 
   if (parsed.is_error !== false) {
     const subtype = typeof parsed.subtype === "string" ? parsed.subtype : "不明";

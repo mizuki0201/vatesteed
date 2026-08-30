@@ -24,17 +24,9 @@ export const CLAUDE_OPUS_BASE_ARGS = [
   "--model",
   "opus",
   "--output-format",
-  "json",
+  "stream-json",
+  "--verbose",
 ] as const;
-
-/**
- * 往復数の上限。
- *
- * 上限に達したときは結果を捨てず、実行記録を残して同じセッションから再開する。
- * ここは実行資源の上限であって、分析の深さ（精査する過去の出走数や1組の馬の数）とは
- * 別のもの。**依頼ごとに変わる値をここに埋め込まない。**
- */
-export const CLAUDE_MAX_TURNS = 24;
 
 /**
  * 子プロセスに固定で渡す環境変数。
@@ -67,24 +59,47 @@ export function buildClaudeOpusArgs({
 
   const resumeArgs = resumeSessionId === null ? [] : ["--resume", resumeSessionId];
 
-  return [
-    ...CLAUDE_OPUS_BASE_ARGS,
-    ...resumeArgs,
-    "--max-turns",
-    String(CLAUDE_MAX_TURNS),
-    prompt,
-  ];
+  return [...CLAUDE_OPUS_BASE_ARGS, ...resumeArgs, prompt];
 }
 
-/** 入口が受け取れるコマンド。 */
+/** コマンドラインから受け取る操作。依頼本文は受け取らず、タスクMarkdownだけを受け取る。 */
+export type ClaudeCliCommand =
+  | { kind: "check-auth" }
+  | { kind: "new"; taskPath: string }
+  | { kind: "restart"; taskPath: string }
+  | { kind: "resume"; runId: string; taskPath: string };
+
+/** 検証済みのタスクから組み立てた、実行処理へ渡す値。 */
 export type ClaudeCommand =
-  | { kind: "new"; prompt: string }
-  | { kind: "resume"; runId: string; prompt: string };
+  | {
+      kind: "check-auth";
+      prompt: string;
+      taskPath: null;
+      mode: null;
+      executorRole: null;
+    }
+  | {
+      kind: "new";
+      prompt: string;
+      taskPath: string;
+      mode: "development" | "racing";
+      executorRole: string;
+    }
+  | {
+      kind: "resume";
+      runId: string;
+      prompt: string;
+      taskPath: string;
+      mode: "development" | "racing";
+      executorRole: string;
+    };
 
 const USAGE = [
   "使い方:",
-  '  pnpm claude:opus -- "Claude Code への依頼文"',
-  '  pnpm claude:opus -- --resume <実行記録のID> -- "続きの依頼文"',
+  "  pnpm claude:opus -- --check-auth",
+  "  pnpm claude:opus -- --task docs/tasks/<タスク名>.md",
+  "  pnpm claude:opus -- --resume <実行記録のID> --task docs/tasks/<タスク名>.md",
+  "  pnpm claude:opus -- --restart --task docs/tasks/<タスク名>.md",
 ].join("\n");
 
 /**
@@ -92,23 +107,29 @@ const USAGE = [
  *
  * **再開できないときに新規実行へ切り替えない。** 形式が合わなければ例外にする。
  */
-export function parseClaudeCommand(argv: readonly string[]): ClaudeCommand {
+export function parseClaudeCommand(argv: readonly string[]): ClaudeCliCommand {
   const args = argv[0] === "--" ? argv.slice(1) : argv;
+
+  if (args.length === 1 && args[0] === "--check-auth") {
+    return { kind: "check-auth" };
+  }
 
   if (args[0] === "--resume" || args[0] === "-r") {
     const runId = args[1] ?? "";
-    const promptArgs = args[2] === "--" ? args.slice(3) : args.slice(2);
-
-    if (runId === "" || promptArgs.length !== 1) {
+    if (runId === "" || args[2] !== "--task" || args.length !== 4) {
       throw new Error(USAGE);
     }
 
-    return { kind: "resume", runId: assertRunId(runId), prompt: promptArgs[0] };
+    return { kind: "resume", runId: assertRunId(runId), taskPath: args[3] };
   }
 
-  if (args.length !== 1) {
-    throw new Error(USAGE);
+  if (args[0] === "--task" && args.length === 2) {
+    return { kind: "new", taskPath: args[1] };
   }
 
-  return { kind: "new", prompt: args[0] };
+  if (args[0] === "--restart" && args[1] === "--task" && args.length === 3) {
+    return { kind: "restart", taskPath: args[2] };
+  }
+
+  throw new Error(USAGE);
 }

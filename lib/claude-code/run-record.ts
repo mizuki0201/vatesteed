@@ -10,8 +10,9 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { TaskMode } from "./task-file.ts";
 
 /** 実行記録を置くディレクトリ（リポジトリからの相対）。gitignore 済み。 */
 export const CLAUDE_RUNS_DIR = ".claude/runs";
@@ -22,13 +23,19 @@ export const CLAUDE_RUNS_DIR = ".claude/runs";
  * `completed` は検証をすべて通ったときだけ。終了コードが0でも、検証に落ちていれば
  * `incomplete` のまま残す。
  */
-export type ClaudeRunState = "completed" | "incomplete";
+export type ClaudeRunState = "running" | "completed" | "incomplete";
 
 export type ClaudeRunRecord = {
   /** 実行記録のID。ファイル名にもなる */
   runId: string;
   /** Claude Code が返したセッションID。再開に使う。取れなければ null */
   sessionId: string | null;
+  /** 実行するタスクMarkdown。接続確認ではnull */
+  taskPath: string | null;
+  /** タスクのモード。接続確認と旧形式の実行記録ではnull */
+  mode: TaskMode | null;
+  /** タスクで指定された実行役。接続確認と旧形式の実行記録ではnull */
+  executorRole: string | null;
   state: ClaudeRunState;
   /** Claude Code プロセスの終了コード。シグナルで落ちたときは null */
   exitCode: number | null;
@@ -121,13 +128,21 @@ export function parseRunRecord(text: string): ClaudeRunRecord {
   }
 
   const state = parsed.state;
-  if (state !== "completed" && state !== "incomplete") {
-    throw new Error("実行記録の state が completed でも incomplete でもありません。");
+  if (state !== "running" && state !== "completed" && state !== "incomplete") {
+    throw new Error("実行記録の state が running、completed、incomplete のいずれでもありません。");
+  }
+
+  const modeValue = readNullableString(parsed, "mode");
+  if (modeValue !== null && modeValue !== "development" && modeValue !== "racing") {
+    throw new Error("実行記録の mode が不正です。");
   }
 
   return {
     runId: assertRunId(runId),
     sessionId: readNullableString(parsed, "sessionId"),
+    taskPath: readNullableString(parsed, "taskPath"),
+    mode: modeValue,
+    executorRole: readNullableString(parsed, "executorRole"),
     state,
     exitCode: readNullableNumber(parsed, "exitCode"),
     terminalReason: readNullableString(parsed, "terminalReason"),
@@ -173,6 +188,49 @@ export async function loadRunRecord(dir: string, runId: string): Promise<ClaudeR
   }
 
   return parseRunRecord(text);
+}
+
+/** 同じタスクMarkdownから作られた実行記録を新しい順で返す。 */
+export async function findRunRecordsForTask(
+  dir: string,
+  taskPath: string,
+): Promise<readonly ClaudeRunRecord[]> {
+  const files = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
+  const records: ClaudeRunRecord[] = [];
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    const runId = file.slice(0, -".json".length);
+    const record = await loadRunRecord(dir, runId);
+    if (record.taskPath === taskPath) records.push(record);
+  }
+  return records.sort((left, right) => right.startedAt.localeCompare(left.startedAt));
+}
+
+/**
+ * Claude自体は正常終了していても、呼び出し側の完了判定に落ちたときに未完了へ戻す。
+ * 次回は同じセッションを再開し、新規実行に切り替えない。
+ */
+export async function markRunIncomplete(
+  dir: string,
+  runId: string,
+  error: string,
+  now: () => Date = () => new Date(),
+): Promise<ClaudeRunRecord> {
+  const record = await loadRunRecord(dir, runId);
+  if (record.state === "incomplete") return record;
+
+  const incomplete: ClaudeRunRecord = {
+    ...record,
+    state: "incomplete",
+    error,
+    result: null,
+    updatedAt: now().toISOString(),
+  };
+  await saveRunRecord(dir, incomplete);
+  return incomplete;
 }
 
 /**

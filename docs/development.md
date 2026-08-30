@@ -55,9 +55,17 @@
 - 技術上の制約
 - 完了報告の形式
 
-タスクMarkdownのfrontmatterは `mode: development` とし、Claude Codeを実装者として使うときは
-`executor_role: dev-implementer` とする。競馬の分析を同じタスクに含めない。本人がCodex単体などを
-明示したときは、実際の実行元を `executor_role` に記録する。
+タスクMarkdownのfrontmatterでは、進行役を `coordinator`、実際に作業する製品を `executor`、
+実行時の責務を `executor_role` に分ける。`executor_role` に `codex` や `claude-code` を入れない。
+開発の実装では、どの製品が実行しても `executor_role: dev-implementer` とする。競馬の分析を同じ
+タスクに含めない。準備が終わったかは `preparation_status` に記録し、実行元へ渡す前に `ready` にする。
+
+```yaml
+coordinator: codex # または claude-code
+executor: claude-code # または codex
+executor_role: dev-implementer
+preparation_status: ready # 準備中は preparing
+```
 
 ## 1つの依頼が終わるまで
 
@@ -73,6 +81,10 @@
    具体的な不合格理由を再掲した新しい実装依頼を送る。
 7. **進行役が受け入れ後にコミットする。** コミットや push をしてよいかは、その開発依頼で指定
    された範囲に従う。
+
+1つのエージェントで完結する場合もこの順序を変えない。同じエージェントが実装後に差分とテストを
+読み直して受け入れを判断し、進行役として `status: done` にする。別の製品による確認を、共通の
+完了条件にはしない。
 
 ## 進行役の必須レビューと受け入れ
 

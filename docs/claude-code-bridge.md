@@ -32,16 +32,31 @@ Claude Code の役定義もすべて `anthropic/claude-opus-5` に固定する�
 完了させる。開発と競馬の分析を同じファイルへ混ぜない。両方を含む依頼は2つのタスクへ分け、
 「参照」に依存関係を書く。
 
-タスクMarkdownのfrontmatterには `mode` と `executor_role` を必須で持たせる。
+タスクMarkdownのfrontmatterには、共通のタスク形式に従って `mode`、`coordinator`、`executor`、
+`executor_role`、`preparation_status` を必須で持たせる。この文書の経路では、進行役と実行元を
+次のように固定する。
 
 ```yaml
 mode: development # または racing
-executor_role: dev-implementer # racingではentry-analystなど
+coordinator: codex
+executor: claude-code
+executor_role: dev-implementer # 複数の競馬の役が必要ならorchestrator
+preparation_status: ready
 ```
 
 `development` では開発用の必須項目と `dev-` で始まる役を、`racing` では競馬用の必須項目と
-分析する役を検証する。`mode` が無い、値が不正、役がモードと合わない、必須項目が足りない場合は
+分析する役または `orchestrator` を検証する。`executor` が `claude-code` でない、
+`preparation_status` が `ready` でない、値が不正、役がモードと合わない、必須項目が足りない場合は
 Claude Codeを起動しない。
+
+競馬の依頼では、Codex が依頼の完了に必要な事前調査を行ってから `preparation_status: ready` にする。
+対象の特定、必要な出走歴、最低限の血統、レースや血統に関する参考情報など、依頼に応じた調査結果を
+「事前調査」と「参照元」へ記録する。Claude Code は渡された資料とDBを先に照合し、不足や誤りの
+疑いが判断に影響するときは、必要な範囲を定めて追加調査してよい。
+
+複数の競馬の役が必要な依頼は `executor_role: orchestrator` とし、必要な専門役と順序をタスク本文へ
+書く。現在の入口は子エージェントを禁止しているため、1つのClaude Codeセッションが必要な役の
+指示を読んで順番に実行する。専門役の数を理由にセッションを増やさない。
 
 - 新規実行は `pnpm claude:opus -- --task docs/tasks/<タスク名>.md` を使う
 - 中断・利用枠エラー・検証不合格になった後は、
@@ -59,6 +74,10 @@ Claude Codeを起動する前に、実行記録を `running` として `.claude/
 検索やツール呼び出しのたびには更新しない。競馬の分析でDBを更新するときは、DBへ保存し、DBを
 読み直して確認し、その結果をMarkdownへ記載してから次へ進む。再開時はMarkdownだけを信用せず、
 DBまたはコード差分と照合する。
+
+Claude Code はこの経路では実行者であり、`status: done` にしない。完了条件を満たしたことを
+記録して終了し、Codex が成果物を確認して受け入れた後に `status: done` にする。これは
+CodexからClaude Codeへ渡す経路の決まりであり、共通のタスク管理では進行役が完了を判断する。
 
 入口は、モデルの終了コードだけを成功と見なさない。JSONの最終結果、`claude-opus-5` の使用、
 終了理由、子エージェント数を検証し、どれかが欠ければ未完了として実行記録に残す。標準出力が空、

@@ -39,7 +39,10 @@ export {
   assertClaudeExecutableTask,
   buildTaskPrompt,
   loadTaskContract,
+  ORCHESTRATOR_ROLE,
+  type TaskAgent,
   type TaskContract,
   type TaskMode,
+  type TaskPreparationStatus,
   type TaskStatus,
 } from "./task-file.ts";

@@ -23,7 +23,10 @@ description: このリポジトリのタスクを起票・更新・完了する�
 title: レース名の別名マスタを作る
 area: lib
 mode: development
+coordinator: codex
+executor: claude-code
 executor_role: dev-implementer
+preparation_status: preparing
 status: todo
 created: 2026-08-09
 updated: 2026-08-09
@@ -79,13 +82,37 @@ updated: 2026-08-09
 | `title` | 日本語のタイトル。ファイル名と対応させる |
 | `area` | 責務・領域。`agent` `app` `lib` `db` `docs` `ops` など（**例示であって網羅ではない**。当てはまるものが無ければ新しく付けてよい） |
 | `mode` | `development` / `racing` のどちらか。アプリ自体の開発と競馬に関する作業を混ぜない |
-| `executor_role` | 実際の実行元または役。Claude Codeで開発するときは `dev-implementer`、競馬では分析する役、本人が別の実行元を明示したときはその実行元 |
+| `coordinator` | 進行役。`codex` / `claude-code` のどちらか。要件整理・受け入れ・完了判断を担う側 |
+| `executor` | 実行元。`codex` / `claude-code` のどちらか。実際に作業する側 |
+| `executor_role` | 実行時の役。開発では `dev-implementer` などの開発役、競馬では分析する役、複数の分析する役が要るときは `orchestrator`。**実行元（`codex` `claude-code`）は入れない** |
+| `preparation_status` | `preparing` / `ready` のどちらか。実行元へ渡す前に `ready` にする |
 | `status` | `todo` / `doing` / `blocked` / `done` のどれか |
 | `created` | 起票した日 |
 | `updated` | 最後に中身を触った日。**触ったら必ず更新する** |
 
 `status: blocked` のときは、frontmatter に `blocked_by:` を足して何待ちかを1行で書く。動けるように
 なったら消す。
+
+### 進行役と実行元と役
+
+**進行役（`coordinator`）と実行元（`executor`）と実行時の役（`executor_role`）は別のもの**として
+記録する。同じタスク形式を次の3通りで使う。特定の1通りだけを前提にしない。
+
+| `coordinator` | `executor` | 使い方 |
+| --- | --- | --- |
+| `codex` | `claude-code` | Codex が準備したタスクを `pnpm claude:opus` から Claude Code へ渡す |
+| `codex` | `codex` | Codex 単体で準備・実行・確認を順番に行う |
+| `claude-code` | `claude-code` | Claude Code 単体で準備・実行・確認を順番に行う |
+
+役は実行元の名前ではない。開発の実装は、どの実行元でも `executor_role: dev-implementer` とする。
+競馬で複数の分析する役が必要な依頼は `executor_role: orchestrator` とし、必要な専門役と順序を
+本文に書く。役の数を理由にセッションを増やさない。
+
+進行役は、実行元へ渡す前に依頼の完了に必要な事前調査を行う。競馬では、対象の特定、必要な出走歴、
+最低限の血統、レースや血統に関する参考情報など、依頼ごとに必要な項目を決め、出典・確認時点・
+確認できた事実・食い違い・取れなかった情報を「事前調査」と「参照元」へ残す。取得したページ本文は
+貼らない。実行元はその資料とDBを先に使い、不足や誤りの疑いが判断に影響するときだけ追加調査する。
+進行役と実行元が同じときも、同じ実行元がこの準備を先に行う。
 
 ### モード別の項目
 
@@ -96,7 +123,7 @@ updated: 2026-08-09
 - `対象外`
 - `変更結果`
 - `テスト結果`
-- `Codexの受け入れ結果`
+- `受け入れ結果`
 
 `mode: racing` では、共通項目に加えて次を置く。
 
@@ -116,11 +143,13 @@ updated: 2026-08-09
 frontmatter だけをまとめて読む。
 
 ```bash
-grep -H "^title:\|^area:\|^mode:\|^executor_role:\|^status:" docs/tasks/*.md
+grep -H "^title:\|^area:\|^mode:\|^coordinator:\|^executor:\|^executor_role:\|^preparation_status:\|^status:" docs/tasks/*.md
 ```
 
 読んだら `status` ごとにまとめて口頭で伝える。ファイルの中身をそのまま貼り付けない。`done` は
-聞かれたときだけ出す。領域を指定されたら `area` で絞る。
+聞かれたときだけ出す。領域を指定されたら `area` で絞る。**`preparation_status: preparing` のものは、
+まだ実行元へ渡せない準備中として分けて伝える。** 誰が進めるかを聞かれたら `coordinator` と
+`executor` を合わせて答える。
 
 ### 起票する
 
@@ -128,9 +157,12 @@ grep -H "^title:\|^area:\|^mode:\|^executor_role:\|^status:" docs/tasks/*.md
    そのタスクに書き足していいか確認する
 2. 「なぜ」と「完了条件」を埋める。依頼の文面から埋まらない部分は推測で埋めず、本人に聞く
 3. `mode` を決める。開発と競馬の分析が含まれるなら2ファイルに分ける
-4. `executor_role` と `area` を決める。領域をまたぐときは主なほうを選び、もう一方は「参照」に書く
-5. 共通項目とモード別の項目を埋める
-6. `status: todo` で作る。すぐ着手すると分かっているときだけ `doing` にする
+4. `coordinator`、`executor`、`executor_role`、`area` を決める。領域をまたぐときは主なほうを選び、
+   もう一方は「参照」に書く
+5. 準備が終わるまでは `preparation_status: preparing` にする。進行役が必要な事前調査を終え、
+   「事前調査」と（競馬では）「参照元」を埋めてから `ready` にする
+6. 共通項目とモード別の項目を埋める
+7. `status: todo` で作る。すぐ着手すると分かっているときだけ `doing` にする
 
 ### 内容を更新する / ステータスを変える
 
@@ -142,7 +174,7 @@ grep -H "^title:\|^area:\|^mode:\|^executor_role:\|^status:" docs/tasks/*.md
 - 判断や方針が決まった → 「作業記録」に日付付きで1行足す
 - 前提が変わって完了条件そのものが変わった → 「完了条件」を書き換え、「作業記録」に変えた理由を残す
 
-Claude Codeが実行するときは、検索やツール呼び出しのたびではなく、意味のある作業単位が終わるたびに
+実行元がどれであっても、検索やツール呼び出しのたびではなく、意味のある作業単位が終わるたびに
 「現在地」「保存確認」「作業記録」を更新する。競馬の情報を保存するときは、DBへの保存、DBの
 読み直し、Markdownの更新の順に行う。再開時はMarkdownだけを信用せず、DBまたはコード差分と
 照合してから続ける。
@@ -152,9 +184,10 @@ Claude Codeが実行するときは、検索やツール呼び出しのたびで
 ### 完了にする
 
 1. 完了条件のチェックボックスが全部 `- [x]` になっているか確認する。**残っているのに閉じない**
-2. DB、コード差分、テストなど、モードに応じた成果物を実行元とは別に確認する
-3. Codexが受け入れた後に `status: done` とし、`updated` を実行日にする。Claude Codeは自分で
-   `status: done` にしない
+2. DB、コード差分、テストなど、モードに応じた成果物を進行役が確認する。実行元の完了報告だけで
+   受け入れない。進行役と実行元が同じときも、成果物そのものを読み直してから判断する
+3. 進行役が受け入れた後に `status: done` とし、`updated` を実行日にする。進行役と実行元が違う
+   ときは、実行元は自分で `status: done` にしない
 4. ファイルは `docs/tasks/` に置いたまま。**移動も削除もしない**
 
 ### 設計の「未確定事項」を持ち込まれたとき

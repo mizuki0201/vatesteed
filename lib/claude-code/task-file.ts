@@ -3,12 +3,29 @@ import path from "node:path";
 
 export type TaskMode = "development" | "racing";
 export type TaskStatus = "todo" | "doing" | "blocked" | "done";
+/** タスクを進める側と実際に作業する側に入る製品。 */
+export type TaskAgent = "codex" | "claude-code";
+export type TaskPreparationStatus = "preparing" | "ready";
+
+/** 複数の役を1つのセッションで順番に実行するときの `executor_role`。 */
+export const ORCHESTRATOR_ROLE = "orchestrator";
+
+/** オーケストレーターの指示。専門役と違い `agent/subagents/` の下には置かない。 */
+const ORCHESTRATOR_INSTRUCTION_PATH = "agent/instructions.md";
 
 export type TaskContract = {
   readonly title: string;
   readonly area: string;
   readonly mode: TaskMode;
+  /** 進行役。要件整理・受け入れ・完了判断を担う側 */
+  readonly coordinator: TaskAgent;
+  /** 実行元。実際に作業する側 */
+  readonly executor: TaskAgent;
+  /** 実行時の役。実行元は入れない */
   readonly executorRole: string;
+  /** 役の指示。リポジトリからの相対パス */
+  readonly roleInstructionPath: string;
+  readonly preparationStatus: TaskPreparationStatus;
   readonly status: TaskStatus;
   readonly created: string;
   readonly updated: string;
@@ -37,10 +54,21 @@ const MODE_SECTIONS: Readonly<Record<TaskMode, readonly string[]>> = {
     "対象外",
     "変更結果",
     "テスト結果",
-    "Codexの受け入れ結果",
+    "受け入れ結果",
   ],
   racing: ["分析対象", "対象ごとの進捗", "DBへの保存結果", "参照元", "未登録・未分析"],
 };
+
+/**
+ * docs/architecture.md「Claude Code の実行元」で使うと決めた3通り。
+ *
+ * 進行役と実行元を取り違えたタスクを、起動前にここで弾く。
+ */
+const SUPPORTED_ROUTES: readonly (readonly [TaskAgent, TaskAgent])[] = [
+  ["codex", "claude-code"],
+  ["codex", "codex"],
+  ["claude-code", "claude-code"],
+];
 
 function unquote(value: string): string {
   if (
@@ -91,6 +119,22 @@ function parseMode(value: string): TaskMode {
   return value;
 }
 
+function parseAgent(key: string, value: string): TaskAgent {
+  if (value !== "codex" && value !== "claude-code") {
+    throw new Error(`タスクMarkdownの ${key} は codex または claude-code にしてください。`);
+  }
+  return value;
+}
+
+function parsePreparationStatus(value: string): TaskPreparationStatus {
+  if (value !== "preparing" && value !== "ready") {
+    throw new Error(
+      "タスクMarkdownの preparation_status は preparing または ready にしてください。",
+    );
+  }
+  return value;
+}
+
 function parseStatus(value: string): TaskStatus {
   if (value !== "todo" && value !== "doing" && value !== "blocked" && value !== "done") {
     throw new Error("タスクMarkdownの status が不正です。");
@@ -127,17 +171,43 @@ function assertSections(body: string, mode: TaskMode): void {
   }
 }
 
+function assertSupportedRoute(coordinator: TaskAgent, executor: TaskAgent): void {
+  const supported = SUPPORTED_ROUTES.some(
+    ([supportedCoordinator, supportedExecutor]) =>
+      supportedCoordinator === coordinator && supportedExecutor === executor,
+  );
+  if (!supported) {
+    throw new Error(
+      `coordinator と executor の組み合わせが使える3通りにありません: ${coordinator} と ${executor}`,
+    );
+  }
+}
+
 function assertRoleMatchesMode(mode: TaskMode, executorRole: string): void {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(executorRole)) {
     throw new Error("executor_roleの形式が不正です。");
   }
-  if (executorRole === "codex") return;
-  if (mode === "development" && !executorRole.startsWith("dev-")) {
-    throw new Error("developmentのexecutor_roleはdev-で始まる開発役にしてください。");
+  if (executorRole === "codex" || executorRole === "claude-code") {
+    throw new Error(
+      "executor_roleには実行元ではなく役を書いてください。実行元は executor に書きます。",
+    );
   }
-  if (mode === "racing" && executorRole.startsWith("dev-")) {
+  if (mode === "development") {
+    if (!executorRole.startsWith("dev-")) {
+      throw new Error("developmentのexecutor_roleはdev-で始まる開発役にしてください。");
+    }
+    return;
+  }
+  if (executorRole.startsWith("dev-")) {
     throw new Error("racingのexecutor_roleに開発役は指定できません。");
   }
+}
+
+/** 役の指示がどこにあるかを返す。オーケストレーターだけ置き場所が違う。 */
+function roleInstructionPath(executorRole: string): string {
+  return executorRole === ORCHESTRATOR_ROLE
+    ? ORCHESTRATOR_INSTRUCTION_PATH
+    : path.posix.join("agent/subagents", executorRole, "instructions.md");
 }
 
 function taskPath(rootDir: string, requestedPath: string): {
@@ -152,7 +222,7 @@ function taskPath(rootDir: string, requestedPath: string): {
   return { absolutePath, relativePath: path.relative(rootDir, absolutePath) };
 }
 
-/** タスクMarkdownを読み、Claude Codeへ渡す前提を検証する。 */
+/** タスクMarkdownを読み、共通のタスク形式を満たしているかを検証する。 */
 export async function loadTaskContract(
   rootDir: string,
   requestedPath: string,
@@ -163,27 +233,28 @@ export async function loadTaskContract(
   });
   const { fields, body } = parseFrontmatter(source);
   const mode = parseMode(required(fields, "mode"));
+  const coordinator = parseAgent("coordinator", required(fields, "coordinator"));
+  const executor = parseAgent("executor", required(fields, "executor"));
   const executorRole = required(fields, "executor_role");
+  const preparationStatus = parsePreparationStatus(required(fields, "preparation_status"));
   const status = parseStatus(required(fields, "status"));
+  assertSupportedRoute(coordinator, executor);
   assertRoleMatchesMode(mode, executorRole);
-  if (executorRole !== "codex") {
-    const instructionPath = path.join(
-      rootDir,
-      "agent/subagents",
-      executorRole,
-      "instructions.md",
-    );
-    await access(instructionPath).catch(() => {
-      throw new Error(`executor_roleの指示が見つかりません: ${executorRole}`);
-    });
-  }
+  const instructionPath = roleInstructionPath(executorRole);
+  await access(path.join(rootDir, instructionPath)).catch(() => {
+    throw new Error(`executor_roleの指示が見つかりません: ${executorRole}`);
+  });
   assertSections(body, mode);
 
   return {
     title: required(fields, "title"),
     area: required(fields, "area"),
     mode,
+    coordinator,
+    executor,
     executorRole,
+    roleInstructionPath: instructionPath,
+    preparationStatus,
     status,
     created: required(fields, "created"),
     updated: required(fields, "updated"),
@@ -192,10 +263,27 @@ export async function loadTaskContract(
   };
 }
 
-/** Claude Codeで実行してよいタスクかを確かめる。 */
+/**
+ * Claude Code の入口で実行してよいタスクかを確かめる。
+ *
+ * この入口はCodexからClaude Codeへ渡す経路だけのものなので、他の2通りをここで弾く。
+ * 直接起動したClaude Codeが自分で進めるタスクは、この入口から呼び直さない。
+ */
 export function assertClaudeExecutableTask(task: TaskContract): void {
-  if (task.executorRole === "codex") {
-    throw new Error("executor_roleがcodexのタスクはClaude Codeで実行できません。");
+  if (task.executor !== "claude-code") {
+    throw new Error(
+      `executorが ${task.executor} のタスクはClaude Codeの入口から実行できません。`,
+    );
+  }
+  if (task.coordinator !== "codex") {
+    throw new Error(
+      "この入口はCodexが進行役のタスクだけを実行します。直接起動したClaude Codeはこの入口を使いません。",
+    );
+  }
+  if (task.preparationStatus !== "ready") {
+    throw new Error(
+      "Claude Codeを起動する前に、進行役が準備を終えて preparation_status を ready にしてください。",
+    );
   }
   if (task.status === "todo") {
     throw new Error("Claude Codeを起動する前にタスクのstatusをdoingにしてください。");
@@ -205,32 +293,52 @@ export function assertClaudeExecutableTask(task: TaskContract): void {
   }
 }
 
-/** タスクの本文を複製せず、Claude Codeへ読み方と更新規則だけを渡す。 */
+const AGENT_LABEL: Readonly<Record<TaskAgent, string>> = {
+  codex: "Codex",
+  "claude-code": "Claude Code",
+};
+
+/** タスクの本文を複製せず、実行元へ読み方と更新規則だけを渡す。 */
 export function buildTaskPrompt(task: TaskContract, resumed: boolean): string {
+  const selfCoordinated = task.coordinator === task.executor;
   const common = [
     `あなたは ${task.executorRole} として実行する。`,
-    `agent/subagents/${task.executorRole}/instructions.md を全文読み、その役の指示に従う。`,
+    `${task.roleInstructionPath} を全文読み、その役の指示に従う。`,
+  ];
+
+  if (task.executorRole === ORCHESTRATOR_ROLE) {
+    common.push(
+      "タスク本文で指定された専門役の agent/subagents/<役>/instructions.md を必要な順に読み、1つのセッションの中で段階ごとに実行する。役の数を理由に子エージェントを起動しない。",
+    );
+  }
+
+  common.push(
     `最初に ${task.taskPath} を全文読み、このファイルだけを依頼内容と進捗の記録として扱う。`,
     `modeは ${task.mode}。別のmodeの作業へ移らない。`,
     "再開時はMarkdownだけを信用せず、実際のDBまたはコード差分と照合して現在地を直してから続ける。",
     "検索やツール呼び出しのたびではなく、意味のある作業単位が完了するたびに「現在地」「保存確認」「作業記録」を更新する。",
     "完了条件を満たした場合、または継続できない問題が発生した場合は、現在地と理由を更新して終了する。",
-    "status: doneはCodexが成果物を確認して受け入れた後に更新する。自分では変更しない。",
-  ];
+    selfCoordinated
+      ? "status: doneは、自分で成果物を読み直して完了条件を満たしたと確認できたときだけ更新する。"
+      : `status: doneは進行役の${AGENT_LABEL[task.coordinator]}が成果物を確認して受け入れた後に更新する。自分では変更しない。`,
+  );
 
   if (task.mode === "development") {
     common.push(
-      "コード変更とテストを行い、「変更結果」「テスト結果」を更新する。Codexの受け入れ結果はCodexだけが更新する。",
+      selfCoordinated
+        ? "コード変更とテストを行い、「変更結果」「テスト結果」を更新する。差分とテスト結果を読み直してから「受け入れ結果」を更新する。"
+        : "コード変更とテストを行い、「変更結果」「テスト結果」を更新する。「受け入れ結果」は進行役が更新する。",
     );
   } else {
     common.push(
+      "タスクの「事前調査」「参照元」に渡された資料とDBを先に照合する。不足や誤りの疑いが判断に影響するときだけ、確かめる範囲を決めて追加調査する。",
       "コードと設計docsは変更しない。競馬の情報はDBへ保存し、DBを読み直して確認してから「対象ごとの進捗」「DBへの保存結果」「現在地」を更新する。",
       "取得したページ本文は保存せず、必要な要約と参照元だけを残す。",
     );
   }
 
   if (resumed) {
-    common.push("これは同じClaude Codeセッションの再開である。完了済みの作業を繰り返さず、未完了の次の作業から続ける。");
+    common.push(`これは同じ${AGENT_LABEL[task.executor]}セッションの再開である。完了済みの作業を繰り返さず、未完了の次の作業から続ける。`);
   }
 
   return common.join("\n");

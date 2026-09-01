@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { loadRunRecord, saveRunRecord } from "./run-record.ts";
+import { acquireTaskLock, readTaskLock, taskLockPath, taskLocksDir } from "./task-lock.ts";
 import type { ClaudeCommand } from "./claude-opus.ts";
 import {
   type ClaudeProcessInput,
@@ -437,4 +438,221 @@ test("再開時に別のタスクMarkdownへ差し替えない", async () => {
     }),
     /taskPath.*一致しません/,
   );
+});
+
+/** 実行中として残っている実行記録。前の入口が終わっていない状態を作る。 */
+async function saveRunningRecord(runsDir: string): Promise<void> {
+  await saveRunRecord(runsDir, {
+    runId: "20260901-101500-aaaaaaaa",
+    sessionId: "aaaa-bbbb",
+    taskPath: "docs/tasks/example.md",
+    mode: "development",
+    executorRole: "dev-implementer",
+    state: "running",
+    exitCode: null,
+    terminalReason: null,
+    model: null,
+    subagentsSpawned: null,
+    error: null,
+    result: null,
+    startedAt: "2026-09-01T01:15:00.000Z",
+    updatedAt: "2026-09-01T01:15:00.000Z",
+  });
+}
+
+test("実行中の実行記録があるタスクは新規実行できない", async () => {
+  const runsDir = await makeDir();
+  await saveRunningRecord(runsDir);
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await assert.rejects(
+    () => runClaudeOpus({ command: newCommand("実装する"), runsDir, runProcess: run, env: {} }),
+    /実行中です/,
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("実行中の実行記録があるタスクは再開できない", async () => {
+  const runsDir = await makeDir();
+  await saveRunningRecord(runsDir);
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: resumeCommand("20260901-101500-aaaaaaaa", "続きをやる"),
+        runsDir,
+        runProcess: run,
+        env: {},
+      }),
+    /実行中です/,
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("実行中の実行記録があるタスクは最初からのやり直しもできない", async () => {
+  const runsDir = await makeDir();
+  await saveRunningRecord(runsDir);
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("最初からやり直す"),
+        runsDir,
+        runProcess: run,
+        env: {},
+        allowExistingTaskRun: true,
+      }),
+    /実行中です/,
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("同じタスクのロックを別の入口が持っている間は起動しない", async () => {
+  const runsDir = await makeDir();
+  await acquireTaskLock({
+    dir: taskLocksDir(runsDir),
+    taskPath: "docs/tasks/example.md",
+    pid: 4321,
+    isProcessAlive: () => true,
+  });
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("実装する"),
+        runsDir,
+        runProcess: run,
+        env: {},
+        isProcessAlive: () => true,
+      }),
+    /実行中です/,
+  );
+  assert.equal(calls.length, 0);
+  assert.equal((await readdir(runsDir)).length, 0);
+});
+
+test("同じタスクを同時に2回呼んでもClaudeを起動するのは1回だけ", async () => {
+  const runsDir = await makeDir();
+  let started: (() => void) | undefined;
+  let finish: (() => void) | undefined;
+  const processStarted = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const processMayFinish = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let calls = 0;
+  const runProcess: ClaudeProcessRunner = async () => {
+    calls += 1;
+    started?.();
+    await processMayFinish;
+    return { exitCode: 0, stdout: successStdout(), stderr: "" };
+  };
+
+  const first = runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess,
+    env: {},
+  });
+  await processStarted;
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("同時に実装する"),
+        runsDir,
+        runProcess,
+        env: {},
+      }),
+    /実行中です/,
+  );
+  assert.equal(calls, 1);
+
+  finish?.();
+  const output = await first;
+  assert.equal(output.ok, true);
+  assert.equal(calls, 1);
+});
+
+test("実行が終わるとロックを解放する", async () => {
+  const runsDir = await makeDir();
+  const output = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout() }).run,
+    env: {},
+  });
+
+  assert.equal(output.ok, true);
+  assert.deepEqual(
+    await readTaskLock(taskLockPath(taskLocksDir(runsDir), "docs/tasks/example.md")),
+    { kind: "missing" },
+  );
+});
+
+test("拒否したときもロックを残さない", async () => {
+  const runsDir = await makeDir();
+  await saveRunningRecord(runsDir);
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("実装する"),
+        runsDir,
+        runProcess: stubRunner({ stdout: successStdout() }).run,
+        env: {},
+      }),
+    /実行中です/,
+  );
+  assert.deepEqual(
+    await readTaskLock(taskLockPath(taskLocksDir(runsDir), "docs/tasks/example.md")),
+    { kind: "missing" },
+  );
+});
+
+test("異常終了で残ったロックを回収し、実行中のままの記録を再開できる形へ戻す", async () => {
+  const runsDir = await makeDir();
+  await saveRunningRecord(runsDir);
+  await acquireTaskLock({
+    dir: taskLocksDir(runsDir),
+    taskPath: "docs/tasks/example.md",
+    pid: 4321,
+    isProcessAlive: () => true,
+  });
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  const output = await runClaudeOpus({
+    command: resumeCommand("20260901-101500-aaaaaaaa", "続きをやる"),
+    runsDir,
+    runProcess: run,
+    env: {},
+    isProcessAlive: () => false,
+  });
+
+  assert.equal(output.ok, true);
+  assert.equal(output.run.runId, "20260901-101500-aaaaaaaa");
+  assert.ok(calls[0].args.includes("aaaa-bbbb"));
+});
+
+test("接続確認はタスクのロックを取らない", async () => {
+  const runsDir = await makeDir();
+  const output = await runClaudeOpus({
+    command: {
+      kind: "check-auth",
+      prompt: "Return exactly: AUTH_OK",
+      taskPath: null,
+      mode: null,
+      executorRole: null,
+    },
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout() }).run,
+    env: {},
+  });
+
+  assert.equal(output.ok, true);
+  await assert.rejects(() => readdir(taskLocksDir(runsDir)));
 });

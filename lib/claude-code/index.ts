@@ -28,6 +28,16 @@ export {
   saveRunRecord,
 } from "./run-record.ts";
 export {
+  acquireTaskLock,
+  readTaskLock,
+  type AcquireTaskLockOptions,
+  type TaskLock,
+  type TaskLockFile,
+  type TaskLockState,
+  taskLockPath,
+  taskLocksDir,
+} from "./task-lock.ts";
+export {
   type ClaudeProcessInput,
   type ClaudeProcessOutcome,
   type ClaudeProcessRunner,

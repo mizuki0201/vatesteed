@@ -20,6 +20,7 @@ import {
   resumableSessionId,
   saveRunRecord,
 } from "./run-record.ts";
+import { acquireTaskLock, taskLocksDir } from "./task-lock.ts";
 
 export type ClaudeProcessOutcome = {
   /** シグナルで落ちたときは null */
@@ -54,6 +55,8 @@ export type RunClaudeOpusOptions = {
   command: ClaudeCommand;
   /** 実行記録を置くディレクトリ */
   runsDir: string;
+  /** タスク単位のロックを置くディレクトリ。既定は実行記録のディレクトリの隣 */
+  locksDir?: string;
   runProcess: ClaudeProcessRunner;
   /** 子プロセスに渡す環境変数のもと。既定は呼び出し元の環境 */
   env?: Record<string, string | undefined>;
@@ -62,6 +65,8 @@ export type RunClaudeOpusOptions = {
   reopenCompleted?: boolean;
   /** 本人が最初からやり直すよう明示したときだけ、同じタスクの新規実行を許す。 */
   allowExistingTaskRun?: boolean;
+  /** ロックの持ち主がまだ動いているかの確認。テストで差し込む */
+  isProcessAlive?: (pid: number) => boolean;
 };
 
 function messageOf(error: unknown): string {
@@ -86,23 +91,72 @@ function assertSameTask(previous: ClaudeRunRecord, command: ClaudeCommand): void
  * 1回の実行を行い、実行記録を残す。
  *
  * 再開できない実行記録を渡されたときは例外にする。**新規実行へ黙って切り替えない。**
+ *
+ * **同じタスクの実行は同時に1つだけ。** タスク単位のロックを先に取り、取れなければ新規実行も
+ * 再開も `--restart` も行わない（docs/claude-code-bridge.md の「実行の単位と再開」）。
  */
-export async function runClaudeOpus({
-  command,
-  runsDir,
-  runProcess,
-  env = process.env,
-  now = () => new Date(),
-  reopenCompleted = false,
-  allowExistingTaskRun = false,
-}: RunClaudeOpusOptions): Promise<ClaudeRunOutput> {
+export async function runClaudeOpus(options: RunClaudeOpusOptions): Promise<ClaudeRunOutput> {
+  const { command, runsDir, locksDir = taskLocksDir(runsDir), now, isProcessAlive } = options;
+
+  // 接続確認にはタスクMarkdownが無いので、ロックを取る対象も無い。
+  if (command.taskPath === null) return runLocked(options, null);
+
+  const lock = await acquireTaskLock({
+    dir: locksDir,
+    taskPath: command.taskPath,
+    now,
+    isProcessAlive,
+  });
+  try {
+    return await runLocked(options, lock.reclaimedFrom);
+  } finally {
+    await lock.release();
+  }
+}
+
+/**
+ * ロックを取った状態で1回ぶんを実行する。
+ *
+ * `reclaimedFrom` が入っているのは、前回の入口が異常終了してロックが残っていた場合。その
+ * プロセスが存在しないことは確認済みなので、`running` のまま残った実行記録を未完了へ戻す。
+ * 戻さないと、そのタスクは再開もできなくなる。
+ */
+async function runLocked(
+  {
+    command,
+    runsDir,
+    runProcess,
+    env = process.env,
+    now = () => new Date(),
+    reopenCompleted = false,
+    allowExistingTaskRun = false,
+  }: RunClaudeOpusOptions,
+  reclaimedFrom: number | null,
+): Promise<ClaudeRunOutput> {
   const startedAt = now().toISOString();
 
-  if (command.kind === "new" && !allowExistingTaskRun) {
-    const [existing] = await findRunRecordsForTask(runsDir, command.taskPath);
-    if (existing !== undefined) {
+  if (command.taskPath !== null) {
+    const records = await findRunRecordsForTask(runsDir, command.taskPath);
+    const running = records.filter((record) => record.state === "running");
+
+    if (reclaimedFrom !== null) {
+      for (const record of running) {
+        await markRunIncomplete(
+          runsDir,
+          record.runId,
+          `前回の実行（プロセス ${reclaimedFrom}）が実行記録を running のまま終了した。`,
+          now,
+        );
+      }
+    } else if (running[0] !== undefined) {
       throw new Error(
-        `タスク ${command.taskPath} には実行記録 ${existing.runId} があります。新規実行せず、同じ実行記録を再開してください。`,
+        `タスク ${command.taskPath} は実行記録 ${running[0].runId} が実行中です。終わるまで新規実行も再開もできません。`,
+      );
+    }
+
+    if (command.kind === "new" && !allowExistingTaskRun && records[0] !== undefined) {
+      throw new Error(
+        `タスク ${command.taskPath} には実行記録 ${records[0].runId} があります。新規実行せず、同じ実行記録を再開してください。`,
       );
     }
   }

@@ -394,14 +394,15 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 | predict-race | 予想 | `race_predictions` `race_prediction_conditions` `ai_predictions` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | plan-bets | 予想 | `ai_bets` `ai_bet_legs` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | intake-memos | 常に働く | `memos` ほか（宛先による） | [agent-design.md のメモの取り込み](agent-design.md#メモの取り込み2026-08-22-決定) |
-| improve-agent | 常に働く | `docs/` `agent/` | agent-design.md（**未記述**） |
+| improve-agent | 常に働く | `docs/` `agent/` | [agent-design.md の判断の誤りを直す](agent-design.md#6-判断の誤りを直す) |
 | write-note-article | 発信 | — | publishing.md |
 | write-zenn-article | 発信 | — | publishing.md |
 | write-x-post | 発信 | — | publishing.md |
 
 **register-race / predict-race / plan-bets は中身を書いた**（2026-08-15）。**review-race も
-書いた**（2026-08-16）。**intake-memos も書いた**（2026-08-22）。残る improve-agent と発信の3つは
-枠だけ。手順の正本を agent-design.md か publishing.md に書いてから、スキルをそこから書き起こす。
+書いた**（2026-08-16）。**intake-memos も書いた**（2026-08-22）。**improve-agent も書いた**
+（2026-09-01）。残る発信の3つは枠だけ。手順の正本を publishing.md に書いてから、スキルをそこから
+書き起こす。
 
 `agent/skills/` には開発で使う `task-management` も入っているが、製品の運用ではないので
 [development.md](development.md) 側で扱う。

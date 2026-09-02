@@ -1,5 +1,7 @@
 import { query } from "../db/index.ts";
 import { assertCan } from "../access/index.ts";
+import { HORSE_PAGE_SIZE, horsePage } from "./pagination.ts";
+import { DEFAULT_HORSE_STATUS, horseStatusCondition, type HorseStatus } from "./status.ts";
 
 /** 馬の画面が読むもの。 */
 
@@ -51,16 +53,39 @@ export type HorseEntry = {
   readonly noteAuthor: string | null;
 };
 
-export type HorseStatus = "all" | "active" | "retired";
+/** 一覧の1ページぶん。件数はページの中ではなく、条件に当たる全頭を指す。 */
+export type HorseList = {
+  readonly horses: readonly HorseSummary[];
+  readonly total: number;
+  readonly page: number;
+  readonly pageCount: number;
+};
 
-/** 一覧。`q` を渡すと馬名の部分一致で絞る。現役を既定にする。 */
-export async function listHorses(options: { readonly q?: string; readonly status?: HorseStatus } = {}): Promise<
-  readonly HorseSummary[]
-> {
+/**
+ * 一覧を1ページぶん読む。`q` を渡すと馬名の部分一致で絞る。現役を既定にする。
+ *
+ * 件数と馬を別々に読む。ページ番号が総ページ数を超えていたら最終ページに寄せるため、
+ * どのページを読むかを決める前に全件数が要る。
+ */
+export async function listHorses(
+  options: { readonly q?: string; readonly status?: HorseStatus; readonly page?: number } = {},
+): Promise<HorseList> {
   await assertCan("horses");
 
   const q = options.q?.trim();
-  const status = options.status ?? "active";
+  const status = options.status ?? DEFAULT_HORSE_STATUS;
+  const condition = horseStatusCondition(status);
+
+  const { rows: countRows } = await query(
+    `SELECT count(*) AS total
+       FROM horses h
+      WHERE ($1::text IS NULL OR h.name ILIKE '%' || $1 || '%')
+        AND ${condition}`,
+    [q || null],
+  );
+
+  const total = Number(countRows[0]?.total ?? 0);
+  const { page, pageCount, offset } = horsePage({ total, page: options.page ?? 1 });
 
   const { rows } = await query(
     `SELECT h.id, h.name, h.sex, h.birth_year, h.retired_at, t.name AS trainer_name,
@@ -69,13 +94,13 @@ export async function listHorses(options: { readonly q?: string; readonly status
        FROM horses h
        LEFT JOIN trainers t ON t.id = h.trainer_id
       WHERE ($1::text IS NULL OR h.name ILIKE '%' || $1 || '%')
-        AND ($2 = 'all' OR CASE WHEN $2 = 'retired' THEN h.retired_at IS NOT NULL ELSE h.retired_at IS NULL END)
+        AND ${condition}
       ORDER BY h.name
-      LIMIT 200`,
-    [q || null, status],
+      LIMIT $2 OFFSET $3`,
+    [q || null, HORSE_PAGE_SIZE, offset],
   );
 
-  return rows.map((row) => ({
+  const horses = rows.map((row) => ({
     id: String(row.id),
     name: String(row.name),
     sex: (row.sex as string | null) ?? null,
@@ -85,6 +110,8 @@ export async function listHorses(options: { readonly q?: string; readonly status
     hasNote: Boolean(row.has_note),
     retiredAt: (row.retired_at as string | null) ?? null,
   }));
+
+  return { horses, total, page, pageCount };
 }
 
 export async function getHorse(id: string): Promise<HorseDetail | undefined> {

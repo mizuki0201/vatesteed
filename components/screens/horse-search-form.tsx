@@ -1,6 +1,10 @@
-export function HorseSearchForm({ q }: { readonly q?: string }) {
+import { DEFAULT_HORSE_STATUS, type HorseStatus } from "@/lib/horses";
+
+export function HorseSearchForm({ q, status }: { readonly q?: string; readonly status: HorseStatus }) {
   return (
     <form action="/horses" className="flex w-full max-w-md flex-wrap gap-2" method="get">
+      {/* 探しても表示区分は変えない。ページ番号は送らないので、探すたびに1ページ目に戻る */}
+      {status === DEFAULT_HORSE_STATUS ? null : <input name="status" type="hidden" value={status} />}
       <input
         aria-label="馬名を検索"
         className="min-w-40 grow rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-ring"

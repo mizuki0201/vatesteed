@@ -16,6 +16,7 @@
 --   0010_race_laps_and_prediction_conditions.sql
 --   0011_memos.sql
 --   0011_notes_no_internal_terms.sql
+--   0012_horses_is_overseas.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -196,17 +197,18 @@ CREATE TABLE horse_notes (
 );
 
 CREATE TABLE horses (
-  id         bigserial                NOT NULL,
-  name       text                     NOT NULL,
-  name_kana  text,
-  birth_year integer,
-  sex        text,
-  sire_id    bigint,
-  dam_id     bigint,
-  trainer_id bigint,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  retired_at date,
+  id          bigserial                NOT NULL,
+  name        text                     NOT NULL,
+  name_kana   text,
+  birth_year  integer,
+  sex         text,
+  sire_id     bigint,
+  dam_id      bigint,
+  trainer_id  bigint,
+  created_at  timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at  timestamp with time zone NOT NULL DEFAULT now(),
+  retired_at  date,
+  is_overseas boolean                  NOT NULL DEFAULT false,
   CONSTRAINT horses_pkey PRIMARY KEY (id),
   CONSTRAINT horses_sex_check CHECK ((sex = ANY (ARRAY['牡'::text, '牝'::text, 'セン'::text])))
 );

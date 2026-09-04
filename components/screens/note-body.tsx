@@ -1,4 +1,5 @@
 import { Streamdown } from "streamdown";
+import { formatPedigreeNoteBody } from "@/lib/pedigree-note";
 import { cn } from "@/lib/utils";
 
 /**
@@ -48,6 +49,19 @@ export function NoteBody({
       <Prose>{body}</Prose>
     </div>
   );
+}
+
+/** 血統評価。保存済みの本文にある見出し名だけの行も、見出しとして表示する。 */
+export function PedigreeNoteBody({
+  body,
+  author,
+  className,
+}: {
+  readonly body: string;
+  readonly author: string;
+  readonly className?: string;
+}) {
+  return <NoteBody author={author} body={formatPedigreeNoteBody(body)} className={className} />;
 }
 
 /**

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Card, Empty, PageShell } from "@/components/screens/page-shell";
-import { NoteBody } from "@/components/screens/note-body";
+import { NoteBody, PedigreeNoteBody } from "@/components/screens/note-body";
 import { SearchForm } from "@/components/screens/search-form";
 import { countNotesByKind, listNotes, NOTE_KINDS, NOTE_KIND_LABEL, type NoteKind } from "@/lib/notes";
 
@@ -64,7 +64,11 @@ export default async function Page({
                     {note.updatedAt}
                   </span>
                 </div>
-                <NoteBody author={note.author} body={note.body} />
+                {note.kind === "pedigree" ? (
+                  <PedigreeNoteBody author={note.author} body={note.body} />
+                ) : (
+                  <NoteBody author={note.author} body={note.body} />
+                )}
               </Card>
             </li>
           ))}

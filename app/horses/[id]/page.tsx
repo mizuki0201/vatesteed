@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
-import { NoteBody } from "@/components/screens/note-body";
+import { NoteBody, PedigreeNoteBody } from "@/components/screens/note-body";
 import { getHorse, listHorseEntries } from "@/lib/horses";
 
 export const metadata: Metadata = { title: "馬 — Vatesteed" };
@@ -65,7 +65,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
                 </p>
               </details>
             ) : null}
-            <NoteBody author={horse.pedigreeNote.author} body={horse.pedigreeNote.body} />
+            <PedigreeNoteBody author={horse.pedigreeNote.author} body={horse.pedigreeNote.body} />
           </Card>
         ) : (
           <Empty>

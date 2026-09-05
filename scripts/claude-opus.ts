@@ -17,6 +17,7 @@ import {
   buildTaskPrompt,
   type ClaudeProcessRunner,
   type ClaudeProgress,
+  createProgressFilter,
   formatActivityLine,
   loadTaskContract,
   parseClaudeCommand,
@@ -62,8 +63,8 @@ const runProcess: ClaudeProcessRunner = (input) =>
     });
   });
 
-/** 進捗の表示が同じ内容で続くときは間を空ける。 */
-const PROGRESS_REPEAT_INTERVAL_MS = 60_000;
+/** 進捗表示を最大1分に1回へ抑え、連携自体でCodexの文脈を増やしすぎない。 */
+const PROGRESS_INTERVAL_MS = 60_000;
 
 /**
  * 実行中の進捗を標準エラーへ出す。
@@ -71,16 +72,10 @@ const PROGRESS_REPEAT_INTERVAL_MS = 60_000;
  * 標準出力は最後のJSONだけにしておく。**本文もコマンドもツール結果も出さない。**
  */
 function createProgressWriter(): (progress: ClaudeProgress) => void {
-  let lastShown = "";
-  let lastShownAt = 0;
+  const shouldShow = createProgressFilter(PROGRESS_INTERVAL_MS);
 
   return (progress) => {
-    const current = `${progress.kind ?? ""}:${progress.toolName ?? ""}`;
-    const at = Date.parse(progress.at);
-    if (current === lastShown && at - lastShownAt < PROGRESS_REPEAT_INTERVAL_MS) return;
-
-    lastShown = current;
-    lastShownAt = at;
+    if (!shouldShow(progress)) return;
     process.stderr.write(`${formatActivityLine(progress)}\n`);
   };
 }

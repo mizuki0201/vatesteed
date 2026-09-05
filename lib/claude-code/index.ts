@@ -5,6 +5,7 @@ export {
   type ClaudeActivityTracker,
   type ClaudeProgress,
   createActivityTracker,
+  createProgressFilter,
   formatActivityLine,
   isClaudeActivityKind,
 } from "./activity.ts";

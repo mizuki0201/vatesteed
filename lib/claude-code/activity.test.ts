@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createActivityTracker, formatActivityLine } from "./activity.ts";
+import { createActivityTracker, createProgressFilter, formatActivityLine } from "./activity.ts";
 
 function line(event: Record<string, unknown>): string {
   return `${JSON.stringify(event)}\n`;
@@ -162,4 +162,32 @@ test("種類がまだ分からないときも進捗を1行にできる", () => {
   });
 
   assert.match(written, /1件 受信/);
+});
+
+test("活動の種類が切り替わっても表示は指定した間隔に抑える", () => {
+  const shouldShow = createProgressFilter(60_000);
+  const progress = (kind: "startup" | "text" | "tool_use" | "tool_result", at: string) => ({
+    runId: "20260905-201421-255553c6",
+    eventCount: 1,
+    kind,
+    toolName: kind === "tool_use" ? "Bash" : null,
+    at,
+  });
+
+  assert.equal(shouldShow(progress("startup", "2026-09-05T11:14:00.000Z")), true);
+  assert.equal(shouldShow(progress("text", "2026-09-05T11:14:10.000Z")), false);
+  assert.equal(shouldShow(progress("tool_use", "2026-09-05T11:14:20.000Z")), false);
+  assert.equal(shouldShow(progress("tool_result", "2026-09-05T11:15:00.000Z")), true);
+});
+
+test("最終結果は直前に進捗を出していても表示する", () => {
+  const shouldShow = createProgressFilter(60_000);
+  const base = {
+    runId: "20260905-201421-255553c6",
+    eventCount: 1,
+    toolName: null,
+  };
+
+  assert.equal(shouldShow({ ...base, kind: "text", at: "2026-09-05T11:14:00.000Z" }), true);
+  assert.equal(shouldShow({ ...base, kind: "result", at: "2026-09-05T11:14:01.000Z" }), true);
 });

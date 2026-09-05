@@ -171,6 +171,29 @@ export type ClaudeProgress = {
   at: string;
 };
 
+/**
+ * 進捗を画面へ出す頻度を抑える。
+ *
+ * 実行記録はイベントごとに更新したまま、Codexの文脈へ入る進捗行だけを間引く。最終結果は
+ * 間隔にかかわらず表示する。
+ */
+export function createProgressFilter(intervalMs: number): (progress: ClaudeProgress) => boolean {
+  let lastShownAt: number | null = null;
+
+  return (progress) => {
+    const at = Date.parse(progress.at);
+    if (progress.kind === "result") {
+      if (!Number.isNaN(at)) lastShownAt = at;
+      return true;
+    }
+    if (Number.isNaN(at)) return true;
+    if (lastShownAt !== null && at - lastShownAt < intervalMs) return false;
+
+    lastShownAt = at;
+    return true;
+  };
+}
+
 function pad(value: number): string {
   return String(value).padStart(2, "0");
 }

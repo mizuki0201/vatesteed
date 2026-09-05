@@ -36,7 +36,7 @@ const commonSections = `
 function modeSections(mode: TaskMode): string {
   return mode === "development"
     ? `## 正本となる設計\n設計\n## 実装範囲\n範囲\n## 対象外\n対象外\n## 変更結果\n未変更\n## テスト結果\n未実行\n## 受け入れ結果\n未確認\n`
-    : `## 分析対象\n馬\n## 対象ごとの進捗\n未完了\n## DBへの保存結果\n未保存\n## 参照元\nURL\n## 未登録・未分析\nあり\n`;
+    : `## 分析対象\n馬\n## 事実の登録結果\n出走を登録して読み直した\n## 対象ごとの進捗\n未完了\n## DBへの保存結果\n未保存\n## 参照元\nURL\n## 未登録・未分析\nあり\n`;
 }
 
 async function fixture(input: {
@@ -129,11 +129,47 @@ test("競馬タスクは渡された調査の照合とDB確認を指示する", 
   });
   const task = await loadTaskContract(root, taskPath);
   const prompt = buildTaskPrompt(task, true);
-  assert.match(prompt, /「事前調査」「参照元」に渡された資料とDBを先に照合/);
-  assert.match(prompt, /判断に影響するときだけ、確かめる範囲を決めて追加調査/);
+  assert.match(prompt, /「事前調査」「参照元」「事実の登録結果」に渡された資料と、登録済みの事実をDBで照合/);
   assert.match(prompt, /DBを読み直して確認/);
   assert.match(prompt, /コードと設計docsは変更しない/);
   assert.match(prompt, /同じClaude Codeセッションの再開/);
+});
+
+test("競馬タスクでは自分で調査も事実の登録もさせず、不足を進行役へ返させる", async () => {
+  const { root, taskPath } = await fixture({ mode: "racing", executorRole: "entry-analyst" });
+  const task = await loadTaskContract(root, taskPath);
+  const prompt = buildTaskPrompt(task, false);
+
+  assert.match(prompt, /自分で外部サイトや動画を見に行かない/);
+  assert.match(prompt, /事実データ.*をDBへ登録しない/u);
+  assert.match(prompt, /「未登録・未分析」へ書いて終了する。進行役のCodexが補ってから/);
+  assert.match(prompt, /DBへ保存するのは分析結果（評価・印・予想・買い目）だけ/);
+});
+
+test("競馬タスクは事実の登録結果が空のままではClaude Codeへ渡せない", async () => {
+  const { root, taskPath } = await fixture({
+    mode: "racing",
+    executorRole: "entry-analyst",
+    sections:
+      "## 分析対象\n馬\n## 事実の登録結果\n\n## 対象ごとの進捗\n未完了\n## DBへの保存結果\n未保存\n## 参照元\nURL\n## 未登録・未分析\nあり\n",
+  });
+  const task = await loadTaskContract(root, taskPath);
+
+  assert.throws(() => assertClaudeExecutableTask(task), /事実の登録結果」が空のまま/);
+});
+
+test("事実の登録結果が埋まっている競馬タスクは渡せる", async () => {
+  const { root, taskPath } = await fixture({ mode: "racing", executorRole: "entry-analyst" });
+  const task = await loadTaskContract(root, taskPath);
+
+  assert.doesNotThrow(() => assertClaudeExecutableTask(task));
+});
+
+test("開発タスクには事実の登録結果を求めない", async () => {
+  const { root, taskPath } = await fixture();
+  const task = await loadTaskContract(root, taskPath);
+
+  assert.doesNotThrow(() => assertClaudeExecutableTask(task));
 });
 
 test("対象が複数ある競馬タスクは1件ずつ保存と確認を終えてから次へ進ませる", async () => {
@@ -175,6 +211,16 @@ test("指示が無い役を指定したタスクを弾く", async () => {
 test("モード別の必須項目が無いタスクを弾く", async () => {
   const { root, taskPath } = await fixture({ sections: "" });
   await assert.rejects(() => loadTaskContract(root, taskPath), /正本となる設計/);
+});
+
+test("競馬タスクに事実の登録結果の項目が無ければ読めない", async () => {
+  const { root, taskPath } = await fixture({
+    mode: "racing",
+    executorRole: "entry-analyst",
+    sections:
+      "## 分析対象\n馬\n## 対象ごとの進捗\n未完了\n## DBへの保存結果\n未保存\n## 参照元\nURL\n## 未登録・未分析\nあり\n",
+  });
+  await assert.rejects(() => loadTaskContract(root, taskPath), /事実の登録結果/);
 });
 
 test("開発と競馬の項目を1つのタスクへ混ぜない", async () => {

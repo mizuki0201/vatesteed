@@ -11,6 +11,7 @@ export {
 } from "./activity.ts";
 export {
   buildClaudeOpusArgs,
+  claudeChildEnv,
   CLAUDE_CHILD_ENV,
   CLAUDE_OPUS_BASE_ARGS,
   type ClaudeCliCommand,

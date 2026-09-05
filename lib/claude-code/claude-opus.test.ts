@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildClaudeOpusArgs, parseClaudeCommand } from "./claude-opus.ts";
+import { AGENT_MODE_ENV } from "../agent-mode/index.ts";
+import { buildClaudeOpusArgs, claudeChildEnv, parseClaudeCommand } from "./claude-opus.ts";
 
 test("Claude Code を Opus 指定で非対話実行する", () => {
   assert.deepEqual(buildClaudeOpusArgs({ prompt: "AUTH_OK だけを返す" }), [
@@ -98,4 +99,16 @@ test("実行記録のIDにファイル名として使えない値を渡さない
     () => parseClaudeCommand(["--", "--resume", "../../etc/passwd", "--task", "docs/tasks/example.md"]),
     /IDの形式/,
   );
+});
+
+test("競馬のタスクにだけ実行モードを渡す", () => {
+  assert.equal(claudeChildEnv("racing")[AGENT_MODE_ENV], "racing");
+  assert.equal(claudeChildEnv("development")[AGENT_MODE_ENV], undefined);
+  assert.equal(claudeChildEnv(null)[AGENT_MODE_ENV], undefined);
+});
+
+test("実行モードを渡しても、同時実行数の固定は変わらない", () => {
+  for (const mode of ["racing", "development", null] as const) {
+    assert.equal(claudeChildEnv(mode).CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY, "2");
+  }
 });

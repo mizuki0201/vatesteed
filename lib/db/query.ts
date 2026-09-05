@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { isRacingAgentMode } from "../agent-mode/index.ts";
 import { query } from "./index.ts";
+import { assertRacingModeAllows } from "./racing-mode.ts";
+import { leadingKeyword } from "./sql-text.ts";
 
 /**
  * 任意の SQL を1文投げて、結果を JSON で返す入口。
@@ -14,6 +17,8 @@ import { query } from "./index.ts";
  * - 長い日本語の本文や引用符はシェルで壊れるので、その場合は `--file` で渡す
  * - **テーブルの形や権限を変える文は弾く。** スキーマの変更経路は `db/migrations/` と
  *   `pnpm db:migrate` に決めてあり、そこを迂回されると検証ブランチを通す手順ごと無くなる
+ * - **競馬モードで動いている Claude Code からは、分析結果のテーブルしか更新できない**
+ *   （`racing-mode.ts`）。事実データの登録は進行役の担当なので、ここで拒否する
  *
  * 接続は `query()`（HTTP 経由のプール接続）。複数の文をまたぐトランザクションは張れない
  * ため、ここで扱うのは1文だけ。まとめて流すものは `db/migrations/` と `pnpm db:migrate`。
@@ -156,55 +161,6 @@ export function assertNotSchemaChange(sqlText: string): void {
   );
 }
 
-/** SQL の先頭のキーワードを大文字で返す。見つからなければ undefined。 */
-function leadingKeyword(sqlText: string): string | undefined {
-  const head = skipLeadingNoise(sqlText).match(/^[A-Za-z]+/);
-  return head?.[0].toUpperCase();
-}
-
-/** SQL の前に付く空白・行コメント・ブロックコメントを飛ばす。 */
-function skipLeadingNoise(sqlText: string): string {
-  let rest = sqlText;
-
-  for (;;) {
-    const before = rest;
-
-    rest = rest.trimStart();
-
-    if (rest.startsWith("--")) {
-      const lineEnd = rest.indexOf("\n");
-      rest = lineEnd === -1 ? "" : rest.slice(lineEnd + 1);
-    } else if (rest.startsWith("/*")) {
-      rest = skipBlockComment(rest);
-    }
-
-    // 何も削れなくなったら、そこが文の頭
-    if (rest === before) return rest;
-  }
-}
-
-/** ブロックコメントを1つ飛ばす。Postgres のブロックコメントは入れ子にできる。 */
-function skipBlockComment(sqlText: string): string {
-  let depth = 0;
-  let index = 0;
-
-  while (index < sqlText.length) {
-    if (sqlText.startsWith("/*", index)) {
-      depth++;
-      index += 2;
-    } else if (sqlText.startsWith("*/", index)) {
-      depth--;
-      index += 2;
-      if (depth === 0) return sqlText.slice(index);
-    } else {
-      index++;
-    }
-  }
-
-  // 閉じていないコメント。この先に文は無い
-  return "";
-}
-
 async function main() {
   let args: ParsedQueryArgs;
 
@@ -226,6 +182,10 @@ async function main() {
 
     // --file の中身も同じように見る。読んだあとに判定するのはそのため
     assertNotSchemaChange(sqlText);
+
+    // 競馬の分析として起動されたときだけ、更新先を分析結果のテーブルに絞る。
+    // Codex から直接使うときと、開発モードの実行はここを通らない
+    if (isRacingAgentMode(process.env)) assertRacingModeAllows(sqlText);
 
     const result = await query(sqlText, args.params);
 

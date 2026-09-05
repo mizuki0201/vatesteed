@@ -47,6 +47,14 @@ const COMMON_SECTIONS = [
   "参照",
 ] as const;
 
+/**
+ * 競馬のタスクで、進行役が事実データをDBへ登録して読み直した結果を書く項目。
+ *
+ * ここが空のまま Claude Code を起動しない。登録されていない事実を Claude Code が自分で
+ * 集めて登録することになり、役割の分担が崩れるため（docs/claude-code-bridge.md）。
+ */
+const FACT_REGISTRATION_SECTION = "事実の登録結果";
+
 const MODE_SECTIONS: Readonly<Record<TaskMode, readonly string[]>> = {
   development: [
     "正本となる設計",
@@ -56,7 +64,14 @@ const MODE_SECTIONS: Readonly<Record<TaskMode, readonly string[]>> = {
     "テスト結果",
     "受け入れ結果",
   ],
-  racing: ["分析対象", "対象ごとの進捗", "DBへの保存結果", "参照元", "未登録・未分析"],
+  racing: [
+    "分析対象",
+    "事実の登録結果",
+    "対象ごとの進捗",
+    "DBへの保存結果",
+    "参照元",
+    "未登録・未分析",
+  ],
 };
 
 /**
@@ -148,6 +163,12 @@ function sectionNames(body: string): Set<string> {
   );
 }
 
+/** 見出し1つぶんの中身を返す。見出しが無ければ空文字。 */
+function sectionBody(body: string, name: string): string {
+  const pattern = new RegExp(`^##\\s+${name}\\s*$([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, "m");
+  return body.match(pattern)?.[1] ?? "";
+}
+
 function assertSections(body: string, mode: TaskMode): void {
   const present = sectionNames(body);
   for (const section of [...COMMON_SECTIONS, ...MODE_SECTIONS[mode]]) {
@@ -164,8 +185,7 @@ function assertSections(body: string, mode: TaskMode): void {
     );
   }
 
-  const completion =
-    body.match(/^##\s+完了条件\s*$([\s\S]*?)(?=^##\s+|(?![\s\S]))/m)?.[1] ?? "";
+  const completion = sectionBody(body, "完了条件");
   if (!/^- \[(?: |x)\] /m.test(completion)) {
     throw new Error("タスクMarkdownの完了条件にチェックボックスがありません。");
   }
@@ -285,6 +305,11 @@ export function assertClaudeExecutableTask(task: TaskContract): void {
       "Claude Codeを起動する前に、進行役が準備を終えて preparation_status を ready にしてください。",
     );
   }
+  if (task.mode === "racing" && sectionBody(task.body, FACT_REGISTRATION_SECTION).trim() === "") {
+    throw new Error(
+      `競馬のタスクは「## ${FACT_REGISTRATION_SECTION}」が空のままClaude Codeを起動できません。進行役が事実データをDBへ登録し、読み直した結果を書いてください。`,
+    );
+  }
   if (task.status === "todo") {
     throw new Error("Claude Codeを起動する前にタスクのstatusをdoingにしてください。");
   }
@@ -331,8 +356,10 @@ export function buildTaskPrompt(task: TaskContract, resumed: boolean): string {
     );
   } else {
     common.push(
-      "タスクの「事前調査」「参照元」に渡された資料とDBを先に照合する。不足や誤りの疑いが判断に影響するときだけ、確かめる範囲を決めて追加調査する。",
-      "コードと設計docsは変更しない。競馬の情報はDBへ保存し、DBを読み直して確認してから「対象ごとの進捗」「DBへの保存結果」「現在地」を更新する。",
+      "タスクの「事前調査」「参照元」「事実の登録結果」に渡された資料と、登録済みの事実をDBで照合してから分析する。",
+      "自分で外部サイトや動画を見に行かない。事実データ（馬・レース・出走・血統関係・結果・ラップ・払戻・コメントなど、外部情報や人間の入力から確かめられて評価では変わらないもの）をDBへ登録しない。",
+      `不足や誤りの疑いが判断に影響するときは、対象・必要な事実・その事実を使う判断を「未登録・未分析」へ書いて終了する。進行役の${AGENT_LABEL[task.coordinator]}が補ってから、同じ実行を再開する。`,
+      "コードと設計docsは変更しない。DBへ保存するのは分析結果（評価・印・予想・買い目）だけで、保存したらDBを読み直して確認してから「対象ごとの進捗」「DBへの保存結果」「現在地」を更新する。",
       "対象が複数あるときは、1件ごとに本文の作成、見直し、DBへの保存、読み直しによる確認、タスクMarkdownへの記録まで終えてから次の対象へ進む。まとめて最後に保存しない。",
       "取得したページ本文は保存せず、必要な要約と参照元だけを残す。",
     );

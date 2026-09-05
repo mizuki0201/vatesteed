@@ -3,6 +3,7 @@ import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { AGENT_MODE_ENV } from "../agent-mode/index.ts";
 import { type ClaudeRunRecord, loadRunRecord, saveRunRecord } from "./run-record.ts";
 import { acquireTaskLock, readTaskLock, taskLockPath, taskLocksDir } from "./task-lock.ts";
 import type { ClaudeCommand } from "./claude-opus.ts";
@@ -133,6 +134,35 @@ test("子エージェントを引数で禁止し、同時実行数を2に固定�
   assert.ok(calls[0].args.includes("Agent"));
   assert.equal(calls[0].env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY, "2");
   assert.equal(calls[0].env.PATH, "/usr/bin");
+});
+
+test("競馬のタスクの子プロセスにだけ実行モードを渡す", async () => {
+  const runsDir = await makeDir();
+  const racing = stubRunner({ stdout: successStdout() });
+  const development = stubRunner({ stdout: successStdout() });
+
+  await runClaudeOpus({
+    command: {
+      kind: "new",
+      prompt: "札幌記念を予想する",
+      taskPath: "docs/tasks/sapporo-kinen.md",
+      mode: "racing",
+      executorRole: "orchestrator",
+    },
+    runsDir,
+    runProcess: racing.run,
+    env: {},
+  });
+  await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir: await makeDir(),
+    runProcess: development.run,
+    // 前の実行の値が残っていても、開発モードでは渡さない
+    env: { [AGENT_MODE_ENV]: "racing" },
+  });
+
+  assert.equal(racing.calls[0].env[AGENT_MODE_ENV], "racing");
+  assert.equal(development.calls[0].env[AGENT_MODE_ENV], undefined);
 });
 
 test("子エージェントが起動した実行は未完了として残す", async () => {

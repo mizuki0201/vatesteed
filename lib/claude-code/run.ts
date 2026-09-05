@@ -8,7 +8,7 @@
 import { type ClaudeProgress, createActivityTracker } from "./activity.ts";
 import {
   buildClaudeOpusArgs,
-  CLAUDE_CHILD_ENV,
+  claudeChildEnv,
   type ClaudeCommand,
 } from "./claude-opus.ts";
 import { checkClaudeResult } from "./result.ts";
@@ -279,7 +279,7 @@ async function runLocked(
   try {
     outcome = await runProcess({
       args,
-      env: { ...env, ...CLAUDE_CHILD_ENV },
+      env: { ...env, ...claudeChildEnv(command.mode) },
       onStdoutChunk: saveActivity,
       abort: controller.signal,
     });

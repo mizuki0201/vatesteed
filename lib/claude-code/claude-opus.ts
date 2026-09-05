@@ -5,6 +5,7 @@
  * 既定モデルやローカル設定に引きずられない。
  */
 
+import { type AgentMode, agentModeEnv } from "../agent-mode/index.ts";
 import { assertRunId } from "./run-record.ts";
 
 /**
@@ -37,6 +38,17 @@ export const CLAUDE_OPUS_BASE_ARGS = [
 export const CLAUDE_CHILD_ENV: Readonly<Record<string, string>> = {
   CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: "2",
 };
+
+/**
+ * 子プロセスへ渡す環境変数を、実行するタスクのモードまで含めて組み立てる。
+ *
+ * 競馬のタスクだけに競馬モードを渡す。渡された側は `pnpm db:query` で事実データを更新
+ * できなくなる（`lib/db/racing-mode.ts`）。開発のタスクと接続確認には渡さないので、
+ * DB の使い方はこれまでどおり変わらない。
+ */
+export function claudeChildEnv(mode: AgentMode | null): Record<string, string | undefined> {
+  return { ...CLAUDE_CHILD_ENV, ...agentModeEnv(mode) };
+}
 
 export type ClaudeOpusArgsInput = {
   prompt: string;

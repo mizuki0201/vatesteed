@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkClaudeResult, sessionIdFromClaudeOutput } from "./result.ts";
+import { checkClaudeResult, classifyClaudeFailure, sessionIdFromClaudeOutput } from "./result.ts";
 
 /** 検証を通る最終結果。各テストはここから1項目だけ崩す。 */
 function successResult(overrides: Record<string, unknown> = {}): string {
@@ -161,4 +161,77 @@ test("session_id が無ければ成功として扱わない", () => {
 
   assert.equal(check.ok, false);
   assert.match(check.ok ? "" : check.reason, /session_id が取れなかった/);
+});
+
+test("利用上限に達した出力を、一般のAPIエラーと分けて記録する", () => {
+  const check = checkClaudeResult(
+    JSON.stringify({
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      result: "Claude AI usage limit reached|1757068800",
+      terminal_reason: "api_error",
+      modelUsage: { "claude-opus-5": {} },
+      session_id: "11111111-2222-3333-4444-555555555555",
+    }),
+  );
+
+  assert.equal(check.ok, false);
+  assert.equal(check.ok ? null : check.failureKind, "usage_limit");
+  assert.equal(check.sessionId, "11111111-2222-3333-4444-555555555555");
+});
+
+test("JSONを返さずに利用上限だけを伝えてきた出力も利用上限として記録する", () => {
+  const check = checkClaudeResult("Claude AI usage limit reached. Try again later.");
+
+  assert.equal(check.ok, false);
+  assert.equal(check.ok ? null : check.failureKind, "usage_limit");
+});
+
+test("起動後に平文の利用上限が返ってもセッションIDを失わない", () => {
+  const check = checkClaudeResult(
+    `${JSON.stringify({ type: "system", session_id: "early-session" })}\nClaude AI usage limit reached.`,
+  );
+
+  assert.equal(check.ok, false);
+  assert.equal(check.ok ? null : check.failureKind, "usage_limit");
+  assert.equal(check.sessionId, "early-session");
+});
+
+test("接続できなかった出力はAPIエラーとして記録する", () => {
+  const check = checkClaudeResult(
+    JSON.stringify({
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      errors: ["getaddrinfo ENOTFOUND api.anthropic.com"],
+      terminal_reason: "api_error",
+      modelUsage: { "claude-opus-5": {} },
+      session_id: "11111111-2222-3333-4444-555555555555",
+    }),
+  );
+
+  assert.equal(check.ok, false);
+  assert.equal(check.ok ? null : check.failureKind, "api_error");
+});
+
+test("検証に落ちただけの結果は利用上限にもAPIエラーにもしない", () => {
+  const check = checkClaudeResult(successResult({ subagent_stats: { spawned: 2 } }));
+
+  assert.equal(check.ok, false);
+  assert.equal(check.ok ? null : check.failureKind, "other");
+});
+
+test("完了した結果の本文に上限の話が出てきても分類に使わない", () => {
+  const check = checkClaudeResult(
+    successResult({ result: "利用上限に達したときの扱いを docs へ書いた。" }),
+  );
+
+  assert.equal(check.ok, true);
+});
+
+test("未完了の理由を分類する", () => {
+  assert.equal(classifyClaudeFailure("429 rate limit"), "usage_limit");
+  assert.equal(classifyClaudeFailure("api_error / 503"), "api_error");
+  assert.equal(classifyClaudeFailure("error_max_turns\nmax_turns"), "other");
 });

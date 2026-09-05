@@ -3,9 +3,11 @@ import { mkdtemp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { loadRunRecord, saveRunRecord } from "./run-record.ts";
+import { type ClaudeRunRecord, loadRunRecord, saveRunRecord } from "./run-record.ts";
 import { acquireTaskLock, readTaskLock, taskLockPath, taskLocksDir } from "./task-lock.ts";
 import type { ClaudeCommand } from "./claude-opus.ts";
+import type { ClaudeProgress } from "./activity.ts";
+import type { ClaudeSignalSource } from "./signals.ts";
 import {
   type ClaudeProcessInput,
   type ClaudeProcessOutcome,
@@ -41,6 +43,34 @@ function stubRunner(outcome: Partial<ClaudeProcessOutcome>): {
   };
 
   return { run, calls };
+}
+
+/** 実行記録を先に置いておくときの雛形。既定は再開できる未完了の記録。 */
+function storedRecord(overrides: Partial<ClaudeRunRecord> = {}): ClaudeRunRecord {
+  return {
+    runId: "20260828-093012-a1b2c3d4",
+    sessionId: "11111111-2222-3333-4444-555555555555",
+    taskPath: "docs/tasks/example.md",
+    mode: "development",
+    executorRole: "dev-implementer",
+    state: "incomplete",
+    exitCode: 1,
+    terminalReason: "max_turns",
+    model: "claude-opus-5",
+    subagentsSpawned: 0,
+    error: "途中で終わった。",
+    failureKind: "other",
+    result: null,
+    completedResult: null,
+    completedAt: null,
+    lastActivityAt: null,
+    lastActivityKind: null,
+    lastActivityTool: null,
+    eventCount: 0,
+    startedAt: "2026-08-28T00:30:12.000Z",
+    updatedAt: "2026-08-28T00:35:00.000Z",
+    ...overrides,
+  };
 }
 
 async function makeDir(): Promise<string> {
@@ -152,6 +182,8 @@ test("検証を通っても終了コードが0でなければ未完了として�
 
   assert.equal(output.ok, false);
   assert.match(output.error ?? "", /終了コードが 0 ではなかった/);
+  assert.equal(output.result, null);
+  assert.equal(output.run.completedResult, "AUTH_OK");
 });
 
 test("子プロセスが起動できなくても実行記録を残す", async () => {
@@ -231,22 +263,7 @@ test("未完了の実行記録から同じセッションを再開する", async
 test("再開は保存されたセッションIDを渡し、新規実行に切り替えない", async () => {
   const runsDir = await makeDir();
   const { run, calls } = stubRunner({ stdout: successStdout() });
-  await saveRunRecord(runsDir, {
-    runId: "20260828-093012-a1b2c3d4",
-    sessionId: "aaaa-bbbb",
-    taskPath: "docs/tasks/example.md",
-    mode: "development",
-    executorRole: "dev-implementer",
-    state: "incomplete",
-    exitCode: 1,
-    terminalReason: "max_turns",
-    model: "claude-opus-5",
-    subagentsSpawned: 0,
-    error: "途中で終わった。",
-    result: null,
-    startedAt: "2026-08-28T00:30:12.000Z",
-    updatedAt: "2026-08-28T00:35:00.000Z",
-  });
+  await saveRunRecord(runsDir, storedRecord({ sessionId: "aaaa-bbbb" }));
 
   await runClaudeOpus({
     command: resumeCommand("20260828-093012-a1b2c3d4", "続きをやる"),
@@ -265,22 +282,17 @@ test("再開は保存されたセッションIDを渡し、新規実行に切り
 test("完了済みの実行記録は再開せず、新規実行にも切り替えない", async () => {
   const runsDir = await makeDir();
   const { run, calls } = stubRunner({ stdout: successStdout() });
-  await saveRunRecord(runsDir, {
-    runId: "20260828-093012-a1b2c3d4",
-    sessionId: "aaaa-bbbb",
-    taskPath: "docs/tasks/example.md",
-    mode: "development",
-    executorRole: "dev-implementer",
-    state: "completed",
-    exitCode: 0,
-    terminalReason: "completed",
-    model: "claude-opus-5",
-    subagentsSpawned: 0,
-    error: null,
-    result: "できた",
-    startedAt: "2026-08-28T00:30:12.000Z",
-    updatedAt: "2026-08-28T00:35:00.000Z",
-  });
+  await saveRunRecord(
+    runsDir,
+    storedRecord({
+      sessionId: "aaaa-bbbb",
+      state: "completed",
+      exitCode: 0,
+      terminalReason: "completed",
+      error: null,
+      result: "できた",
+    }),
+  );
 
   await assert.rejects(
     () =>
@@ -298,22 +310,17 @@ test("完了済みの実行記録は再開せず、新規実行にも切り替�
 test("Codexの確認で未完了なら正常終了した同じセッションを明示的に再開する", async () => {
   const runsDir = await makeDir();
   const { run, calls } = stubRunner({ stdout: successStdout() });
-  await saveRunRecord(runsDir, {
-    runId: "20260828-093012-a1b2c3d4",
-    sessionId: "aaaa-bbbb",
-    taskPath: "docs/tasks/example.md",
-    mode: "development",
-    executorRole: "dev-implementer",
-    state: "completed",
-    exitCode: 0,
-    terminalReason: "completed",
-    model: "claude-opus-5",
-    subagentsSpawned: 0,
-    error: null,
-    result: "実装した",
-    startedAt: "2026-08-28T00:30:12.000Z",
-    updatedAt: "2026-08-28T00:35:00.000Z",
-  });
+  await saveRunRecord(
+    runsDir,
+    storedRecord({
+      sessionId: "aaaa-bbbb",
+      state: "completed",
+      exitCode: 0,
+      terminalReason: "completed",
+      error: null,
+      result: "実装した",
+    }),
+  );
 
   const output = await runClaudeOpus({
     command: resumeCommand("20260828-093012-a1b2c3d4", "不足を直す"),
@@ -412,22 +419,15 @@ test("Claudeの終了前に実行記録とセッションIDを保存する", asy
 
 test("再開時に別のタスクMarkdownへ差し替えない", async () => {
   const runsDir = await makeDir();
-  await saveRunRecord(runsDir, {
-    runId: "20260828-093012-a1b2c3d4",
-    sessionId: "aaaa-bbbb",
-    taskPath: "docs/tasks/original.md",
-    mode: "development",
-    executorRole: "dev-implementer",
-    state: "incomplete",
-    exitCode: 1,
-    terminalReason: "api_error",
-    model: "claude-opus-5",
-    subagentsSpawned: 0,
-    error: "中断した。",
-    result: null,
-    startedAt: "2026-08-28T00:30:12.000Z",
-    updatedAt: "2026-08-28T00:35:00.000Z",
-  });
+  await saveRunRecord(
+    runsDir,
+    storedRecord({
+      sessionId: "aaaa-bbbb",
+      taskPath: "docs/tasks/original.md",
+      terminalReason: "api_error",
+      error: "中断した。",
+    }),
+  );
 
   await assert.rejects(
     () => runClaudeOpus({
@@ -442,22 +442,21 @@ test("再開時に別のタスクMarkdownへ差し替えない", async () => {
 
 /** 実行中として残っている実行記録。前の入口が終わっていない状態を作る。 */
 async function saveRunningRecord(runsDir: string): Promise<void> {
-  await saveRunRecord(runsDir, {
-    runId: "20260901-101500-aaaaaaaa",
-    sessionId: "aaaa-bbbb",
-    taskPath: "docs/tasks/example.md",
-    mode: "development",
-    executorRole: "dev-implementer",
-    state: "running",
-    exitCode: null,
-    terminalReason: null,
-    model: null,
-    subagentsSpawned: null,
-    error: null,
-    result: null,
-    startedAt: "2026-09-01T01:15:00.000Z",
-    updatedAt: "2026-09-01T01:15:00.000Z",
-  });
+  await saveRunRecord(
+    runsDir,
+    storedRecord({
+      runId: "20260901-101500-aaaaaaaa",
+      sessionId: "aaaa-bbbb",
+      state: "running",
+      exitCode: null,
+      terminalReason: null,
+      model: null,
+      subagentsSpawned: null,
+      error: null,
+      startedAt: "2026-09-01T01:15:00.000Z",
+      updatedAt: "2026-09-01T01:15:00.000Z",
+    }),
+  );
 }
 
 test("実行中の実行記録があるタスクは新規実行できない", async () => {
@@ -655,4 +654,205 @@ test("接続確認はタスクのロックを取らない", async () => {
 
   assert.equal(output.ok, true);
   await assert.rejects(() => readdir(taskLocksDir(runsDir)));
+});
+
+/** 中断の書き込みが終わるまで実行記録を読み直す。 */
+async function waitForRunState(runsDir: string, runId: string, state: string): Promise<string> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const record = await loadRunRecord(runsDir, runId);
+    if (record.state === state) return record.state;
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  return (await loadRunRecord(runsDir, runId)).state;
+}
+
+/** 手で送るシグナルの受け取り。実際のプロセスへは送らない。 */
+function manualSignals(): { source: ClaudeSignalSource; send: (signal: string) => void; listening: () => boolean } {
+  const handlers = new Set<(signal: string) => void>();
+
+  return {
+    source: {
+      listen(handler) {
+        handlers.add(handler);
+        return () => handlers.delete(handler);
+      },
+    },
+    send: (signal) => {
+      for (const handler of [...handlers]) handler(signal);
+    },
+    listening: () => handlers.size > 0,
+  };
+}
+
+test("ストリームを受け取るたびに最終活動時刻と活動の要約を残す", async () => {
+  const runsDir = await makeDir();
+  const progress: ClaudeProgress[] = [];
+  const seen: { state: string; kind: string | null; tool: string | null; eventCount: number }[] = [];
+
+  const runProcess: ClaudeProcessRunner = async (input) => {
+    await input.onStdoutChunk?.(
+      `${JSON.stringify({ type: "system", subtype: "init", session_id: "aaaa-bbbb" })}\n`,
+    );
+    await input.onStdoutChunk?.(
+      `${JSON.stringify({
+        type: "assistant",
+        session_id: "aaaa-bbbb",
+        message: { content: [{ type: "tool_use", name: "Bash", input: { command: "psql" } }] },
+      })}\n`,
+    );
+    const running = await loadRunRecord(runsDir, (await readdir(runsDir))[0].slice(0, -".json".length));
+    seen.push({
+      state: running.state,
+      kind: running.lastActivityKind,
+      tool: running.lastActivityTool,
+      eventCount: running.eventCount,
+    });
+    await input.onStdoutChunk?.(`${successStdout({ session_id: "aaaa-bbbb" })}\n`);
+
+    return { exitCode: 0, stdout: successStdout({ session_id: "aaaa-bbbb" }), stderr: "" };
+  };
+
+  const output = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess,
+    env: {},
+    onProgress: (item) => progress.push(item),
+  });
+
+  assert.deepEqual(seen, [
+    { state: "running", kind: "tool_use", tool: "Bash", eventCount: 2 },
+  ]);
+  assert.equal(output.run.eventCount, 3);
+  assert.equal(output.run.lastActivityKind, "result");
+  assert.equal(output.run.lastActivityTool, null);
+  assert.ok(output.run.lastActivityAt !== null);
+  assert.deepEqual(
+    progress.map((item) => [item.eventCount, item.kind, item.toolName]),
+    [
+      [1, "startup", null],
+      [2, "tool_use", "Bash"],
+      [3, "result", null],
+    ],
+  );
+  // 進捗にも実行記録にも、コマンドやツール結果は入れない。
+  assert.equal(JSON.stringify(progress).includes("psql"), false);
+});
+
+test("中断されたら実行記録を未完了にし、中断理由を残してロックを解放する", async () => {
+  const runsDir = await makeDir();
+  const signals = manualSignals();
+  let recordAtInterrupt: string | null = null;
+
+  const runProcess: ClaudeProcessRunner = async (input) => {
+    await input.onStdoutChunk?.(
+      `${JSON.stringify({ type: "system", subtype: "init", session_id: "aaaa-bbbb" })}\n`,
+    );
+    signals.send("SIGINT");
+    assert.equal(input.abort?.aborted, true);
+    const runId = (await readdir(runsDir))[0].slice(0, -".json".length);
+    // 子プロセスの終了を待たずに未完了へ戻すので、書き込みが終わるまで待って読む。
+    recordAtInterrupt = await waitForRunState(runsDir, runId, "incomplete");
+
+    // シグナルを受けた入口は子プロセスを終わらせる。終了コードは付かない。
+    return { exitCode: null, stdout: JSON.stringify({ type: "system", session_id: "aaaa-bbbb" }), stderr: "" };
+  };
+
+  const output = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess,
+    env: {},
+    signals: signals.source,
+  });
+
+  assert.equal(recordAtInterrupt, "incomplete");
+  assert.equal(output.ok, false);
+  assert.equal(output.run.state, "incomplete");
+  assert.equal(output.run.failureKind, "interrupted");
+  assert.match(output.run.error ?? "", /SIGINT で中断された/);
+  assert.equal(output.error, output.run.error);
+  assert.equal(output.run.sessionId, "aaaa-bbbb");
+  assert.deepEqual(await loadRunRecord(runsDir, output.run.runId), output.run);
+  assert.equal(signals.listening(), false);
+  assert.deepEqual(await readdir(taskLocksDir(runsDir)), []);
+});
+
+test("中断のあとに最終結果が届いても完了にしない", async () => {
+  const runsDir = await makeDir();
+  const signals = manualSignals();
+
+  const runProcess: ClaudeProcessRunner = async (input) => {
+    signals.send("SIGTERM");
+    await input.onStdoutChunk?.(`${successStdout()}\n`);
+
+    return { exitCode: 0, stdout: successStdout(), stderr: "" };
+  };
+
+  const output = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess,
+    env: {},
+    signals: signals.source,
+  });
+
+  assert.equal(output.ok, false);
+  assert.equal(output.run.state, "incomplete");
+  assert.equal(output.run.result, null);
+  assert.match(output.run.error ?? "", /SIGTERM で中断された/);
+});
+
+test("中断されなければシグナルの受け取りをやめてから返す", async () => {
+  const runsDir = await makeDir();
+  const signals = manualSignals();
+
+  await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout() }).run,
+    env: {},
+    signals: signals.source,
+  });
+
+  assert.equal(signals.listening(), false);
+});
+
+test("差し戻した再開が利用上限で失敗しても、前回の完了結果を失わない", async () => {
+  const runsDir = await makeDir();
+  const first = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout({ result: "1件目を保存した" }) }).run,
+    env: {},
+  });
+
+  assert.equal(first.run.state, "completed");
+  assert.equal(first.run.completedResult, "1件目を保存した");
+
+  const usageLimit = JSON.stringify({
+    type: "result",
+    subtype: "error_during_execution",
+    is_error: true,
+    result: "Claude AI usage limit reached|1757068800",
+    terminal_reason: "api_error",
+    modelUsage: { "claude-opus-5": {} },
+    session_id: "11111111-2222-3333-4444-555555555555",
+  });
+  const resumed = await runClaudeOpus({
+    command: resumeCommand(first.run.runId, "表現を直す"),
+    runsDir,
+    runProcess: stubRunner({ stdout: usageLimit }).run,
+    env: {},
+    reopenCompleted: true,
+  });
+
+  assert.equal(resumed.ok, false);
+  assert.equal(resumed.run.state, "incomplete");
+  assert.equal(resumed.run.failureKind, "usage_limit");
+  assert.equal(resumed.run.result, null);
+  assert.equal(resumed.run.completedResult, "1件目を保存した");
+  assert.equal(resumed.run.completedAt, first.run.completedAt);
+  assert.deepEqual(await loadRunRecord(runsDir, first.run.runId), resumed.run);
 });

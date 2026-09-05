@@ -1,4 +1,14 @@
 export {
+  ACTIVITY_LABEL,
+  type ClaudeActivity,
+  type ClaudeActivityKind,
+  type ClaudeActivityTracker,
+  type ClaudeProgress,
+  createActivityTracker,
+  formatActivityLine,
+  isClaudeActivityKind,
+} from "./activity.ts";
+export {
   buildClaudeOpusArgs,
   CLAUDE_CHILD_ENV,
   CLAUDE_OPUS_BASE_ARGS,
@@ -9,7 +19,9 @@ export {
 } from "./claude-opus.ts";
 export {
   checkClaudeResult,
+  classifyClaudeFailure,
   sessionIdFromClaudeOutput,
+  type ClaudeFailureKind,
   type ClaudeResultCheck,
   REQUIRED_MODEL_ID,
 } from "./result.ts";
@@ -27,6 +39,11 @@ export {
   runRecordPath,
   saveRunRecord,
 } from "./run-record.ts";
+export {
+  type ClaudeSignalSource,
+  INTERRUPT_SIGNALS,
+  processSignalSource,
+} from "./signals.ts";
 export {
   acquireTaskLock,
   readTaskLock,

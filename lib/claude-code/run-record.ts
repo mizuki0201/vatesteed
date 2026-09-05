@@ -12,6 +12,8 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { type ClaudeActivityKind, isClaudeActivityKind } from "./activity.ts";
+import type { ClaudeFailureKind } from "./result.ts";
 import type { TaskMode } from "./task-file.ts";
 
 /** 実行記録を置くディレクトリ（リポジトリからの相対）。gitignore 済み。 */
@@ -47,8 +49,28 @@ export type ClaudeRunRecord = {
   subagentsSpawned: number | null;
   /** 未完了の理由。完了なら null */
   error: string | null;
+  /** 未完了の理由の分類。完了なら null */
+  failureKind: ClaudeFailureKind | null;
   /** Claude が返した結果本文。未完了なら null */
   result: string | null;
+  /**
+   * 正常完了したときの結果本文。
+   *
+   * 差し戻しで同じセッションを再開すると `result` は消えるが、こちらは残す。再開が利用上限
+   * などで失敗しても、前回の完了結果を確認できるようにするため
+   * （docs/claude-code-bridge.md の「Claude Code と Codex の引き継ぎ」）。
+   */
+  completedResult: string | null;
+  /** `completedResult` を得た時刻 */
+  completedAt: string | null;
+  /** ストリームから最後に活動を受け取った時刻 */
+  lastActivityAt: string | null;
+  /** 直近の活動の種類 */
+  lastActivityKind: ClaudeActivityKind | null;
+  /** 直近の活動がツール実行なら、そのツール名 */
+  lastActivityTool: string | null;
+  /** 今回の実行で受け取ったストリームのイベント数 */
+  eventCount: number;
   startedAt: string;
   updatedAt: string;
 };
@@ -137,6 +159,22 @@ export function parseRunRecord(text: string): ClaudeRunRecord {
     throw new Error("実行記録の mode が不正です。");
   }
 
+  const failureKind = readNullableString(parsed, "failureKind");
+  if (
+    failureKind !== null &&
+    failureKind !== "usage_limit" &&
+    failureKind !== "api_error" &&
+    failureKind !== "interrupted" &&
+    failureKind !== "other"
+  ) {
+    throw new Error("実行記録の failureKind が不正です。");
+  }
+
+  const activityKind = readNullableString(parsed, "lastActivityKind");
+  if (activityKind !== null && !isClaudeActivityKind(activityKind)) {
+    throw new Error("実行記録の lastActivityKind が不正です。");
+  }
+
   return {
     runId: assertRunId(runId),
     sessionId: readNullableString(parsed, "sessionId"),
@@ -149,7 +187,14 @@ export function parseRunRecord(text: string): ClaudeRunRecord {
     model: readNullableString(parsed, "model"),
     subagentsSpawned: readNullableNumber(parsed, "subagentsSpawned"),
     error: readNullableString(parsed, "error"),
+    failureKind,
     result: readNullableString(parsed, "result"),
+    completedResult: readNullableString(parsed, "completedResult"),
+    completedAt: readNullableString(parsed, "completedAt"),
+    lastActivityAt: readNullableString(parsed, "lastActivityAt"),
+    lastActivityKind: activityKind,
+    lastActivityTool: readNullableString(parsed, "lastActivityTool"),
+    eventCount: readNullableNumber(parsed, "eventCount") ?? 0,
     startedAt: readNullableString(parsed, "startedAt") ?? "",
     updatedAt: readNullableString(parsed, "updatedAt") ?? "",
   };
@@ -218,15 +263,20 @@ export async function markRunIncomplete(
   runId: string,
   error: string,
   now: () => Date = () => new Date(),
+  failureKind: ClaudeFailureKind = "other",
 ): Promise<ClaudeRunRecord> {
   const record = await loadRunRecord(dir, runId);
   if (record.state === "incomplete") return record;
 
+  // 正常完了していた結果は `completedResult` に残す。差し戻して再開が失敗しても失わない。
   const incomplete: ClaudeRunRecord = {
     ...record,
     state: "incomplete",
     error,
+    failureKind,
     result: null,
+    completedResult: record.result ?? record.completedResult,
+    completedAt: record.result === null ? record.completedAt : record.updatedAt,
     updatedAt: now().toISOString(),
   };
   await saveRunRecord(dir, incomplete);

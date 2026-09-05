@@ -28,7 +28,14 @@ function makeRecord(overrides: Partial<ClaudeRunRecord> = {}): ClaudeRunRecord {
     model: "claude-opus-5",
     subagentsSpawned: 0,
     error: "終了理由が completed ではなかった（max_turns）。",
+    failureKind: "other",
     result: null,
+    completedResult: null,
+    completedAt: null,
+    lastActivityAt: null,
+    lastActivityKind: null,
+    lastActivityTool: null,
+    eventCount: 0,
     startedAt: "2026-08-28T00:30:12.000Z",
     updatedAt: "2026-08-28T00:35:00.000Z",
     ...overrides,
@@ -79,7 +86,27 @@ test("呼び出し側の検証に落ちた完了記録は同じセッション�
   assert.equal(marked.state, "incomplete");
   assert.equal(marked.result, null);
   assert.equal(marked.error, "保存結果が不足している。");
+  assert.equal(marked.failureKind, "other");
   assert.equal(resumableSessionId(marked), record.sessionId);
+});
+
+test("差し戻して未完了へ戻しても、正常完了したときの結果は残す", async () => {
+  const dir = await makeDir();
+  const record = makeRecord({
+    state: "completed",
+    error: null,
+    failureKind: null,
+    result: "有馬記念の評価を保存した",
+    updatedAt: "2026-08-28T00:35:00.000Z",
+  });
+  await saveRunRecord(dir, record);
+
+  const marked = await markRunIncomplete(dir, record.runId, "表現を直してから受け入れる。");
+
+  assert.equal(marked.result, null);
+  assert.equal(marked.completedResult, "有馬記念の評価を保存した");
+  assert.equal(marked.completedAt, "2026-08-28T00:35:00.000Z");
+  assert.deepEqual(await loadRunRecord(dir, record.runId), marked);
 });
 
 test("実行記録に依頼文や認証情報を書かない", async () => {
@@ -167,6 +194,41 @@ test("旧形式の実行記録はタスク情報をnullとして読める", () =
   assert.equal(parsed.taskPath, null);
   assert.equal(parsed.mode, null);
   assert.equal(parsed.executorRole, null);
+});
+
+test("活動の要約が無い旧形式の実行記録も読める", () => {
+  const {
+    failureKind: _failureKind,
+    completedResult: _completedResult,
+    completedAt: _completedAt,
+    lastActivityAt: _lastActivityAt,
+    lastActivityKind: _lastActivityKind,
+    lastActivityTool: _lastActivityTool,
+    eventCount: _eventCount,
+    ...legacy
+  } = makeRecord();
+
+  const parsed = parseRunRecord(JSON.stringify(legacy));
+
+  assert.equal(parsed.failureKind, null);
+  assert.equal(parsed.completedResult, null);
+  assert.equal(parsed.completedAt, null);
+  assert.equal(parsed.lastActivityAt, null);
+  assert.equal(parsed.lastActivityKind, null);
+  assert.equal(parsed.lastActivityTool, null);
+  assert.equal(parsed.eventCount, 0);
+  assert.equal(parsed.runId, "20260828-093012-a1b2c3d4");
+});
+
+test("知らない活動の種類や分類が入った実行記録を読み流さない", () => {
+  assert.throws(
+    () => parseRunRecord(JSON.stringify(makeRecord({ lastActivityKind: "考え中" as never }))),
+    /lastActivityKind が不正/,
+  );
+  assert.throws(
+    () => parseRunRecord(JSON.stringify(makeRecord({ failureKind: "上限" as never }))),
+    /failureKind が不正/,
+  );
 });
 
 test("ファイル名として使えない実行記録のIDを弾く", () => {

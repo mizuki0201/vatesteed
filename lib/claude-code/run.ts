@@ -5,12 +5,13 @@
  * 組み立て・検証・実行記録の書き込みを試せるようにするため。
  */
 
+import { type ClaudeProgress, createActivityTracker } from "./activity.ts";
 import {
   buildClaudeOpusArgs,
   CLAUDE_CHILD_ENV,
   type ClaudeCommand,
 } from "./claude-opus.ts";
-import { checkClaudeResult, sessionIdFromClaudeOutput } from "./result.ts";
+import { checkClaudeResult } from "./result.ts";
 import {
   type ClaudeRunRecord,
   createRunId,
@@ -20,6 +21,7 @@ import {
   resumableSessionId,
   saveRunRecord,
 } from "./run-record.ts";
+import { type ClaudeSignalSource, processSignalSource } from "./signals.ts";
 import { acquireTaskLock, taskLocksDir } from "./task-lock.ts";
 
 export type ClaudeProcessOutcome = {
@@ -32,8 +34,12 @@ export type ClaudeProcessOutcome = {
 export type ClaudeProcessInput = {
   args: string[];
   env: Record<string, string | undefined>;
-  /** stream-jsonを受け取るたびに呼ぶ。セッションIDを終了前に保存するために使う。 */
+  /**
+   * stream-jsonを受け取るたびに呼ぶ。セッションIDと活動の要約を終了前に保存するために使う。
+   */
   onStdoutChunk?: (chunk: string) => Promise<void>;
+  /** 入口が中断されたときに立つ。受け取った側は子プロセスを終わらせる */
+  abort?: AbortSignal;
 };
 
 export type ClaudeProcessRunner = (input: ClaudeProcessInput) => Promise<ClaudeProcessOutcome>;
@@ -67,10 +73,33 @@ export type RunClaudeOpusOptions = {
   allowExistingTaskRun?: boolean;
   /** ロックの持ち主がまだ動いているかの確認。テストで差し込む */
   isProcessAlive?: (pid: number) => boolean;
+  /** 中断シグナルの受け取り方。既定は実行中のプロセス */
+  signals?: ClaudeSignalSource;
+  /** 実行中の進捗。**本文もコマンドも渡さない** */
+  onProgress?: (progress: ClaudeProgress) => void;
 };
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * 中断された実行記録に書く値。
+ *
+ * 完了扱いにせず、中断理由を残す。正常完了していた結果は `completedResult` に残したまま
+ * にする（docs/claude-code-bridge.md の「Claude Code と Codex の引き継ぎ」）。
+ */
+function interruptedFields(
+  signal: string,
+  now: () => Date,
+): Pick<ClaudeRunRecord, "state" | "error" | "failureKind" | "result" | "updatedAt"> {
+  return {
+    state: "incomplete",
+    error: `入口が ${signal} で中断された。同じ実行記録を再開して続きから進める。`,
+    failureKind: "interrupted",
+    result: null,
+    updatedAt: now().toISOString(),
+  };
 }
 
 function assertSameTask(previous: ClaudeRunRecord, command: ClaudeCommand): void {
@@ -130,6 +159,8 @@ async function runLocked(
     now = () => new Date(),
     reopenCompleted = false,
     allowExistingTaskRun = false,
+    signals = processSignalSource(),
+    onProgress,
   }: RunClaudeOpusOptions,
   reclaimedFrom: number | null,
 ): Promise<ClaudeRunOutput> {
@@ -188,30 +219,74 @@ async function runLocked(
     model: null,
     subagentsSpawned: null,
     error: null,
+    failureKind: null,
     result: null,
+    completedResult: previous?.completedResult ?? null,
+    completedAt: previous?.completedAt ?? null,
+    lastActivityAt: null,
+    lastActivityKind: null,
+    lastActivityTool: null,
+    eventCount: 0,
     startedAt: previous?.startedAt ?? startedAt,
     updatedAt: now().toISOString(),
   };
   await saveRunRecord(runsDir, record);
 
-  let streamedStdout = "";
-  const saveStreamSessionId = async (chunk: string): Promise<void> => {
-    streamedStdout += chunk;
-    const sessionId = sessionIdFromClaudeOutput(streamedStdout);
-    if (sessionId === null || sessionId === record.sessionId) return;
-    record = { ...record, sessionId, updatedAt: now().toISOString() };
+  const controller = new AbortController();
+  let interruptedBy: string | null = null;
+
+  /**
+   * ストリームを受け取るたびに、最終活動時刻と安全な要約だけを実行記録へ書く。
+   *
+   * **本文、コマンド、ツール結果は書かない。** 中断後は、未完了へ戻した実行記録を
+   * `running` に書き戻さないよう何もしない。
+   */
+  const tracker = createActivityTracker();
+  const saveActivity = async (chunk: string): Promise<void> => {
+    const activity = tracker.push(chunk);
+    if (activity === null || interruptedBy !== null) return;
+
+    const at = now().toISOString();
+    record = {
+      ...record,
+      sessionId: activity.sessionId ?? record.sessionId,
+      lastActivityAt: at,
+      lastActivityKind: activity.kind,
+      lastActivityTool: activity.toolName,
+      eventCount: activity.eventCount,
+      updatedAt: at,
+    };
     await saveRunRecord(runsDir, record);
+    onProgress?.({
+      runId: record.runId,
+      eventCount: activity.eventCount,
+      kind: activity.kind,
+      toolName: activity.toolName,
+      at,
+    });
   };
+
+  /** 中断されたら、子プロセスの終了を待たずに未完了として残す。 */
+  const stopListening = signals.listen((signal) => {
+    if (interruptedBy !== null) return;
+    interruptedBy = signal;
+    controller.abort();
+    record = { ...record, ...interruptedFields(signal, now) };
+    void saveRunRecord(runsDir, record).catch(() => {});
+  });
 
   let outcome: ClaudeProcessOutcome;
   try {
     outcome = await runProcess({
       args,
       env: { ...env, ...CLAUDE_CHILD_ENV },
-      onStdoutChunk: saveStreamSessionId,
+      onStdoutChunk: saveActivity,
+      abort: controller.signal,
     });
   } catch (error) {
     outcome = { exitCode: null, stdout: "", stderr: messageOf(error) };
+  } finally {
+    stopListening();
   }
 
   const check = checkClaudeResult(outcome.stdout);
@@ -221,7 +296,8 @@ async function runLocked(
     : exitFailed
       ? `Claude の終了コードが 0 ではなかった（${outcome.exitCode ?? "シグナルで終了"}）。`
       : null;
-  const ok = reason === null;
+  const ok = interruptedBy === null && reason === null;
+  const finishedAt = now().toISOString();
 
   record = {
     ...record,
@@ -232,16 +308,25 @@ async function runLocked(
     model: check.model,
     subagentsSpawned: check.subagentsSpawned,
     error: reason,
-    result: check.ok ? check.result : null,
-    updatedAt: now().toISOString(),
+    failureKind: reason === null ? null : check.ok ? "other" : check.failureKind,
+    // 完了条件を満たさない実行の結果は `result` に置かず、再利用できる本文だけを別に保持する。
+    result: ok && check.ok ? check.result : null,
+    completedResult: check.ok ? check.result : record.completedResult,
+    completedAt: check.ok ? finishedAt : record.completedAt,
+    updatedAt: finishedAt,
   };
+  // 中断はClaudeの検証結果より優先する。途中まで正しく返っていても完了にしない。
+  if (interruptedBy !== null) {
+    record = { ...record, ...interruptedFields(interruptedBy, now) };
+  }
 
   await saveRunRecord(runsDir, record);
 
+  // 中断されたときは、検証の理由ではなく実行記録に残した中断理由をそのまま返す。
   return {
     ok,
     run: record,
     result: record.result,
-    error: reason,
+    error: record.error,
   };
 }

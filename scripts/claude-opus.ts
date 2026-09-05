@@ -16,6 +16,8 @@ import {
   assertClaudeExecutableTask,
   buildTaskPrompt,
   type ClaudeProcessRunner,
+  type ClaudeProgress,
+  formatActivityLine,
   loadTaskContract,
   parseClaudeCommand,
   runClaudeOpus,
@@ -48,6 +50,9 @@ const runProcess: ClaudeProcessRunner = (input) =>
       }
     });
 
+    // 入口が中断されたら、子プロセスも終わらせてから後始末に進む。
+    input.abort?.addEventListener("abort", () => child.kill("SIGTERM"), { once: true });
+
     child.once("error", reject);
     child.once("close", (exitCode: number | null) => {
       stdoutUpdates.then(
@@ -56,6 +61,29 @@ const runProcess: ClaudeProcessRunner = (input) =>
       );
     });
   });
+
+/** 進捗の表示が同じ内容で続くときは間を空ける。 */
+const PROGRESS_REPEAT_INTERVAL_MS = 60_000;
+
+/**
+ * 実行中の進捗を標準エラーへ出す。
+ *
+ * 標準出力は最後のJSONだけにしておく。**本文もコマンドもツール結果も出さない。**
+ */
+function createProgressWriter(): (progress: ClaudeProgress) => void {
+  let lastShown = "";
+  let lastShownAt = 0;
+
+  return (progress) => {
+    const current = `${progress.kind ?? ""}:${progress.toolName ?? ""}`;
+    const at = Date.parse(progress.at);
+    if (current === lastShown && at - lastShownAt < PROGRESS_REPEAT_INTERVAL_MS) return;
+
+    lastShown = current;
+    lastShownAt = at;
+    process.stderr.write(`${formatActivityLine(progress)}\n`);
+  };
+}
 
 const argv = process.argv.slice(2);
 
@@ -89,6 +117,7 @@ try {
     runProcess,
     reopenCompleted: parsed.kind === "resume",
     allowExistingTaskRun: parsed.kind === "restart",
+    onProgress: createProgressWriter(),
   });
 
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);

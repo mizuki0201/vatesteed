@@ -136,6 +136,15 @@ test("競馬タスクは渡された調査の照合とDB確認を指示する", 
   assert.match(prompt, /同じClaude Codeセッションの再開/);
 });
 
+test("対象が複数ある競馬タスクは1件ずつ保存と確認を終えてから次へ進ませる", async () => {
+  const { root, taskPath } = await fixture({ mode: "racing", executorRole: "entry-analyst" });
+  const task = await loadTaskContract(root, taskPath);
+  const prompt = buildTaskPrompt(task, false);
+
+  assert.match(prompt, /1件ごとに本文の作成、見直し、DBへの保存、読み直しによる確認/);
+  assert.match(prompt, /まとめて最後に保存しない/);
+});
+
 test("複数の役が要る競馬タスクはオーケストレーターとして1セッションで実行する", async () => {
   const { root, taskPath } = await fixture({
     mode: "racing",

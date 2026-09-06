@@ -48,12 +48,32 @@ const COMMON_SECTIONS = [
 ] as const;
 
 /**
+ * 競馬のタスクで、進行役が調査の前に登録範囲を決めて書く項目。
+ *
+ * 今回の分析対象として登録するもの、参照だけにする関連情報、例外として登録する再利用可能な
+ * 一般情報とその理由を分けて書く（docs/product.md、docs/agent-design.md）。
+ */
+const FACT_SCOPE_SECTION = "事実の登録範囲";
+
+/**
  * 競馬のタスクで、進行役が事実データをDBへ登録して読み直した結果を書く項目。
  *
  * ここが空のまま Claude Code を起動しない。登録されていない事実を Claude Code が自分で
  * 集めて登録することになり、役割の分担が崩れるため（docs/claude-code-bridge.md）。
  */
 const FACT_REGISTRATION_SECTION = "事実の登録結果";
+
+/** 競馬のタスクで、空のまま Claude Code を起動できない項目と、その理由。 */
+const REQUIRED_RACING_SECTIONS: readonly (readonly [string, string])[] = [
+  [
+    FACT_SCOPE_SECTION,
+    "進行役が、今回の分析対象として登録するもの、参照だけにする関連情報、例外として登録する再利用可能な一般情報とその理由を書いてください。",
+  ],
+  [
+    FACT_REGISTRATION_SECTION,
+    "進行役が事実データをDBへ登録し、読み直した結果を書いてください。",
+  ],
+];
 
 const MODE_SECTIONS: Readonly<Record<TaskMode, readonly string[]>> = {
   development: [
@@ -66,6 +86,7 @@ const MODE_SECTIONS: Readonly<Record<TaskMode, readonly string[]>> = {
   ],
   racing: [
     "分析対象",
+    "事実の登録範囲",
     "事実の登録結果",
     "対象ごとの進捗",
     "DBへの保存結果",
@@ -305,10 +326,14 @@ export function assertClaudeExecutableTask(task: TaskContract): void {
       "Claude Codeを起動する前に、進行役が準備を終えて preparation_status を ready にしてください。",
     );
   }
-  if (task.mode === "racing" && sectionBody(task.body, FACT_REGISTRATION_SECTION).trim() === "") {
-    throw new Error(
-      `競馬のタスクは「## ${FACT_REGISTRATION_SECTION}」が空のままClaude Codeを起動できません。進行役が事実データをDBへ登録し、読み直した結果を書いてください。`,
-    );
+  if (task.mode === "racing") {
+    for (const [section, reason] of REQUIRED_RACING_SECTIONS) {
+      if (sectionBody(task.body, section).trim() === "") {
+        throw new Error(
+          `競馬のタスクは「## ${section}」が空のままClaude Codeを起動できません。${reason}`,
+        );
+      }
+    }
   }
   if (task.status === "todo") {
     throw new Error("Claude Codeを起動する前にタスクのstatusをdoingにしてください。");
@@ -356,7 +381,9 @@ export function buildTaskPrompt(task: TaskContract, resumed: boolean): string {
     );
   } else {
     common.push(
-      "タスクの「事前調査」「参照元」「事実の登録結果」に渡された資料と、登録済みの事実をDBで照合してから分析する。",
+      "タスクの「事前調査」「参照元」「事実の登録範囲」「事実の登録結果」に渡された資料と、登録済みの事実をDBで照合してから分析する。",
+      "「事実の登録範囲」は、今回の分析対象として登録した事実、参照だけにする関連情報、別の分析でも使う一般情報を分けて示している。DBに無い関連情報も、タスクMarkdownにあれば分析材料として使う。",
+      "登録されていないことだけを理由に不足として返さない。参照だけと決まっている関連情報の登録を求めない。",
       "自分で外部サイトや動画を見に行かない。事実データ（馬・レース・出走・血統関係・結果・ラップ・払戻・コメントなど、外部情報や人間の入力から確かめられて評価では変わらないもの）をDBへ登録しない。",
       `不足や誤りの疑いが判断に影響するときは、対象・必要な事実・その事実を使う判断を「未登録・未分析」へ書いて終了する。進行役の${AGENT_LABEL[task.coordinator]}が補ってから、同じ実行を再開する。`,
       "コードと設計docsは変更しない。DBへ保存するのは分析結果（評価・印・予想・買い目）だけで、保存したらDBを読み直して確認してから「対象ごとの進捗」「DBへの保存結果」「現在地」を更新する。",

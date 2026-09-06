@@ -886,3 +886,167 @@ test("差し戻した再開が利用上限で失敗しても、前回の完了�
   assert.equal(resumed.run.completedAt, first.run.completedAt);
   assert.deepEqual(await loadRunRecord(runsDir, first.run.runId), resumed.run);
 });
+
+test("完了として保存した後にだけ、完了の通知を出す", async () => {
+  const runsDir = await makeDir();
+  const completed: string[] = [];
+
+  const ok = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout({ result: "状態: 完了" }) }).run,
+    env: {},
+    onCompleted: async (record) => {
+      // 実行記録は先に保存済みなので、通知を受けた側はそのまま読める。
+      assert.deepEqual(await loadRunRecord(runsDir, record.runId), record);
+      completed.push(record.result ?? "");
+    },
+  });
+
+  assert.equal(ok.ok, true);
+  assert.deepEqual(completed, ["状態: 完了"]);
+});
+
+test("未完了の実行では完了の通知を出さない", async () => {
+  const runsDir = await makeDir();
+  const completed: string[] = [];
+
+  const output = await runClaudeOpus({
+    command: newCommand("実装する"),
+    runsDir,
+    runProcess: stubRunner({ exitCode: 1, stdout: successStdout() }).run,
+    env: {},
+    onCompleted: async (record) => {
+      completed.push(record.runId);
+    },
+  });
+
+  assert.equal(output.ok, false);
+  assert.deepEqual(completed, []);
+});
+
+test("正常完了した実行を差し戻すときだけ、起動前に差し戻しの通知を出す", async () => {
+  const runsDir = await makeDir();
+  const order: string[] = [];
+  const { run } = stubRunner({ stdout: successStdout({ result: "直した" }) });
+  await saveRunRecord(
+    runsDir,
+    storedRecord({
+      sessionId: "aaaa-bbbb",
+      state: "completed",
+      exitCode: 0,
+      terminalReason: "completed",
+      error: null,
+      failureKind: null,
+      result: "実装した",
+    }),
+  );
+
+  const output = await runClaudeOpus({
+    command: resumeCommand("20260828-093012-a1b2c3d4", "指摘を直す"),
+    runsDir,
+    runProcess: async (input) => {
+      order.push("claude");
+      return run(input);
+    },
+    env: {},
+    reopenCompleted: true,
+    onSendBack: async (record) => {
+      order.push("send-back");
+      // 差し戻す前の完了報告を、通知を受けた側がそのまま使える。
+      assert.equal(record.result, "実装した");
+    },
+    onCompleted: async () => {
+      order.push("completed");
+    },
+  });
+
+  assert.equal(output.ok, true);
+  assert.deepEqual(order, ["send-back", "claude", "completed"]);
+});
+
+test("差し戻しの通知に失敗したら、Claude Codeを起動せず完了記録を保つ", async () => {
+  const runsDir = await makeDir();
+  let launches = 0;
+  const { run } = stubRunner({ stdout: successStdout({ result: "直した" }) });
+  await saveRunRecord(
+    runsDir,
+    storedRecord({
+      sessionId: "aaaa-bbbb",
+      state: "completed",
+      exitCode: 0,
+      terminalReason: "completed",
+      error: null,
+      failureKind: null,
+      result: "実装した",
+    }),
+  );
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: resumeCommand("20260828-093012-a1b2c3d4", "指摘を直す"),
+        runsDir,
+        runProcess: async (input) => {
+          launches += 1;
+          return run(input);
+        },
+        env: {},
+        reopenCompleted: true,
+        onSendBack: async () => {
+          throw new Error("具体的な指摘がありません");
+        },
+      }),
+    /具体的な指摘がありません/,
+  );
+
+  assert.equal(launches, 0);
+  assert.equal((await loadRunRecord(runsDir, "20260828-093012-a1b2c3d4")).state, "completed");
+});
+
+test("未完了からの再開は差し戻しに数えない", async () => {
+  const runsDir = await makeDir();
+  const sendBacks: string[] = [];
+  await saveRunRecord(runsDir, storedRecord({ sessionId: "aaaa-bbbb" }));
+
+  const output = await runClaudeOpus({
+    command: resumeCommand("20260828-093012-a1b2c3d4", "続きをやる"),
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout({ result: "続きを終えた" }) }).run,
+    env: {},
+    reopenCompleted: true,
+    onSendBack: async (record) => {
+      sendBacks.push(record.runId);
+    },
+  });
+
+  assert.equal(output.ok, true);
+  assert.deepEqual(sendBacks, []);
+});
+
+test("接続確認は差し戻しにも完了の記録にも数えない", async () => {
+  const runsDir = await makeDir();
+  const notified: string[] = [];
+
+  const output = await runClaudeOpus({
+    command: {
+      kind: "check-auth",
+      prompt: "Return exactly: AUTH_OK",
+      taskPath: null,
+      mode: null,
+      executorRole: null,
+    },
+    runsDir,
+    runProcess: stubRunner({ stdout: successStdout() }).run,
+    env: {},
+    onSendBack: async () => {
+      notified.push("send-back");
+    },
+    onCompleted: async () => {
+      notified.push("completed");
+    },
+  });
+
+  assert.equal(output.ok, true);
+  assert.deepEqual(notified, []);
+});

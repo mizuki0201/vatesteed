@@ -7,6 +7,9 @@
  *   pnpm claude:opus -- --restart --task docs/tasks/<タスク名>.md
  *
  * 手順は docs/claude-code-bridge.md の「実行の単位と再開」が正本。
+ *
+ * レビュー修正の往復を記録するのも、この入口の責務である。**Claude Code へ渡す依頼文には
+ * 記録のことを一切書かない**（docs/claude-code-bridge.md の「レビューと修正回答の記録」）。
  */
 
 import { spawn } from "node:child_process";
@@ -15,6 +18,8 @@ import {
   CLAUDE_RUNS_DIR,
   assertClaudeExecutableTask,
   buildTaskPrompt,
+  type ClaudeCliCommand,
+  type ClaudeCommand,
   type ClaudeProcessRunner,
   type ClaudeProgress,
   createProgressFilter,
@@ -22,7 +27,13 @@ import {
   loadTaskContract,
   parseClaudeCommand,
   runClaudeOpus,
+  type TaskContract,
 } from "../lib/claude-code/index.ts";
+import {
+  openReviewRound,
+  recordReviewReport,
+  REVIEW_RUNS_DIR,
+} from "../lib/review-runs/index.ts";
 
 /** 子プロセスを起動し、標準出力と標準エラーを取る。 */
 const runProcess: ClaudeProcessRunner = (input) =>
@@ -80,32 +91,48 @@ function createProgressWriter(): (progress: ClaudeProgress) => void {
   };
 }
 
+/** 検証済みのタスクから実行処理へ渡す値を組み立てる。接続確認にはタスクが無い。 */
+async function buildCommand(
+  parsed: ClaudeCliCommand,
+): Promise<{ command: ClaudeCommand; task: TaskContract | null }> {
+  if (parsed.kind === "check-auth") {
+    return {
+      command: {
+        kind: "check-auth",
+        prompt: "Return exactly: AUTH_OK",
+        taskPath: null,
+        mode: null,
+        executorRole: null,
+      },
+      task: null,
+    };
+  }
+
+  const task = await loadTaskContract(process.cwd(), parsed.taskPath);
+  assertClaudeExecutableTask(task);
+  const shared = {
+    prompt: buildTaskPrompt(task, parsed.kind === "resume"),
+    taskPath: task.taskPath,
+    mode: task.mode,
+    executorRole: task.executorRole,
+  };
+
+  return {
+    command:
+      parsed.kind === "resume"
+        ? { kind: "resume", runId: parsed.runId, ...shared }
+        : { kind: "new", ...shared },
+    task,
+  };
+}
+
 const argv = process.argv.slice(2);
 
 try {
   const parsed = parseClaudeCommand(argv);
-  const command =
-    parsed.kind === "check-auth"
-      ? {
-          kind: "check-auth" as const,
-          prompt: "Return exactly: AUTH_OK",
-          taskPath: null,
-          mode: null,
-          executorRole: null,
-        }
-      : await (async () => {
-          const task = await loadTaskContract(process.cwd(), parsed.taskPath);
-          assertClaudeExecutableTask(task);
-          const shared = {
-            prompt: buildTaskPrompt(task, parsed.kind === "resume"),
-            taskPath: task.taskPath,
-            mode: task.mode,
-            executorRole: task.executorRole,
-          };
-          return parsed.kind === "new" || parsed.kind === "restart"
-            ? { kind: "new" as const, ...shared }
-            : { kind: "resume" as const, runId: parsed.runId, ...shared };
-        })();
+  const { command, task } = await buildCommand(parsed);
+  const reviewsDir = path.join(process.cwd(), REVIEW_RUNS_DIR);
+
   const output = await runClaudeOpus({
     command,
     runsDir: path.join(process.cwd(), CLAUDE_RUNS_DIR),
@@ -113,6 +140,27 @@ try {
     reopenCompleted: parsed.kind === "resume",
     allowExistingTaskRun: parsed.kind === "restart",
     onProgress: createProgressWriter(),
+    // 差し戻して再開すると決まった時点で、タスクMarkdownの「受け入れ結果」から指摘を読む。
+    onSendBack:
+      task === null
+        ? undefined
+        : async (run) => {
+            await openReviewRound({ dir: reviewsDir, runId: run.runId, taskBody: task.body });
+          },
+    onCompleted:
+      task === null
+        ? undefined
+        : async (run) => {
+            if (run.result === null) return;
+            await recordReviewReport({
+              dir: reviewsDir,
+              runId: run.runId,
+              taskPath: task.taskPath,
+              taskTitle: task.title,
+              mode: task.mode,
+              report: run.result,
+            });
+          },
   });
 
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);

@@ -100,6 +100,15 @@ preparation_status: ready # 準備中は preparing
 - 共有作業ディレクトリの差分に、依頼と無関係な変更を混ぜていない
 - 進行役自身が `pnpm typecheck && pnpm test` を実行し、必要な生成処理と受け入れ条件を確かめた
 
+Codexが進行役でClaude Codeが実装者のとき、正常完了した実行を差し戻して再開する前に、Codexは
+具体的な指摘をタスクMarkdownの「受け入れ結果」へ1項目1箇条書きで書く。往復番号は手で書かない。
+同じ実行記録を再開すると、Codexが使う入口が指摘とClaude Codeの修正回答をローカルのレビュー記録へ
+保存し、番号を付ける。利用上限、APIエラー、中断などからの再開はレビュー修正の往復に数えない。
+
+レビュー記録の書き込み、集計、管理画面は進行役のCodexが管理する。Claude Codeの役の指示や
+実行プロンプトには記録処理を追加せず、Claude Codeにレビュー記録を更新させない。Claude Codeは
+タスクMarkdownに書かれた指摘を修正し、通常の完了報告を返すだけとする。
+
 `dev-reviewer` は削除しない。進行役が必要と判断したときの独立した確認役として残すが、
 受け入れの責任は常に進行役が持つ。`dev-explorer`、`dev-debugger`、`dev-agent-platform`、
 `dev-web-platform` などの既存の開発役も、調査や原因究明の補助として残す。実運用で不要と

@@ -50,6 +50,8 @@ export const REQUIRED_LEVEL = {
   memos: "owner",
   /** 裏側の設計（誰にどこを見せているか）。 */
   dashboard: "owner",
+  /** Codex が Claude Code へ差し戻した指摘と、返ってきた修正回答の記録。 */
+  "claude.reviews": "owner",
 } as const satisfies Readonly<Record<string, AccessLevel>>;
 
 /** 見せる単位の名前。 */

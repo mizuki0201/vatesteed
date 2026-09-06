@@ -273,6 +273,19 @@ test("開発と競馬の項目を1つのタスクへ混ぜない", async () => {
   await assert.rejects(() => loadTaskContract(root, taskPath), /混在させられません/);
 });
 
+test("競馬のタスクにも受け入れ結果を置ける", async () => {
+  // 進行役は分析を差し戻すときも「受け入れ結果」へ指摘を書く。開発の項目が混ざったとは扱わない。
+  const { root, taskPath } = await fixture({
+    mode: "racing",
+    executorRole: "entry-analyst",
+    sections: `${modeSections("racing")}## 受け入れ結果\n- 差し戻し\n- 展開の根拠を足す\n`,
+  });
+
+  const task = await loadTaskContract(root, taskPath);
+  assert.equal(task.mode, "racing");
+  assert.match(task.body, /## 受け入れ結果/);
+});
+
 test("docs/tasks直下以外を読まない", async () => {
   const { root } = await fixture();
   await assert.rejects(() => loadTaskContract(root, "../outside.md"), /docs\/tasks\/直下/);

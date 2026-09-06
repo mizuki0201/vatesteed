@@ -75,6 +75,15 @@ const REQUIRED_RACING_SECTIONS: readonly (readonly [string, string])[] = [
   ],
 ];
 
+/**
+ * どちらのモードに置いてもよい項目。
+ *
+ * 進行役は分析の依頼を差し戻すときも「受け入れ結果」へ指摘を書くので、競馬のタスクにも
+ * 置けるようにする（docs/development.md の「進行役の必須レビューと受け入れ」）。開発では
+ * 必須のまま、競馬では任意。
+ */
+const SHARED_SECTIONS: ReadonlySet<string> = new Set(["受け入れ結果"]);
+
 const MODE_SECTIONS: Readonly<Record<TaskMode, readonly string[]>> = {
   development: [
     "正本となる設計",
@@ -199,7 +208,9 @@ function assertSections(body: string, mode: TaskMode): void {
   }
 
   const otherMode: TaskMode = mode === "development" ? "racing" : "development";
-  const mixedSection = MODE_SECTIONS[otherMode].find((section) => present.has(section));
+  const mixedSection = MODE_SECTIONS[otherMode].find(
+    (section) => present.has(section) && !SHARED_SECTIONS.has(section),
+  );
   if (mixedSection !== undefined) {
     throw new Error(
       `1つのタスクMarkdownにdevelopmentとracingを混在させられません: 「## ${mixedSection}」`,

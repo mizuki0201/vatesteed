@@ -13,6 +13,7 @@ dist
 .claude/worktrees
 .claude/runs
 .claude/runs-locks
+.claude/review-runs
 .claude/settings.local.json
 .claude/*.local.md
 

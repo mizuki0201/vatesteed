@@ -77,6 +77,20 @@ export type RunClaudeOpusOptions = {
   signals?: ClaudeSignalSource;
   /** 実行中の進捗。**本文もコマンドも渡さない** */
   onProgress?: (progress: ClaudeProgress) => void;
+  /**
+   * 正常完了した実行を差し戻して再開すると分かった時点で呼ぶ。**Claude Code を起動する前。**
+   *
+   * 差し戻しの記録を、起動そのものが失敗しても残せるようにするため
+   * （docs/claude-code-bridge.md の「レビューと修正回答の記録」）。何を記録するかは
+   * 入口が決める。ここでは呼ぶ時点だけを持つ。
+   */
+  onSendBack?: (record: ClaudeRunRecord) => Promise<void>;
+  /**
+   * 検証を通り、完了として実行記録を保存した直後に呼ぶ。
+   *
+   * **接続確認では呼ばない。** タスクMarkdownを持たない実行は、記録する依頼が無い。
+   */
+  onCompleted?: (record: ClaudeRunRecord) => Promise<void>;
 };
 
 function messageOf(error: unknown): string {
@@ -161,6 +175,8 @@ async function runLocked(
     allowExistingTaskRun = false,
     signals = processSignalSource(),
     onProgress,
+    onSendBack,
+    onCompleted,
   }: RunClaudeOpusOptions,
   reclaimedFrom: number | null,
 ): Promise<ClaudeRunOutput> {
@@ -196,6 +212,8 @@ async function runLocked(
     command.kind === "resume" ? await loadRunRecord(runsDir, command.runId) : null;
   if (previous !== null) assertSameTask(previous, command);
   if (previous?.state === "completed" && reopenCompleted) {
+    // 正常完了した実行を差し戻すのはここだけ。未完了からの再開はこの分岐を通らない。
+    await onSendBack?.(previous);
     previous = await markRunIncomplete(
       runsDir,
       previous.runId,
@@ -321,6 +339,7 @@ async function runLocked(
   }
 
   await saveRunRecord(runsDir, record);
+  if (record.state === "completed" && command.taskPath !== null) await onCompleted?.(record);
 
   // 中断されたときは、検証の理由ではなく実行記録に残した中断理由をそのまま返す。
   return {

@@ -29,6 +29,14 @@ const SCREENS: readonly { readonly url: string; readonly what: string }[] = [
   { url: "/notes", what: "評価の横断一覧" },
   { url: "/dashboard", what: "ダッシュボード" },
   { url: "/dashboard/record-memo", what: "外で見かけた話の入稿と、取り込み待ちの一覧" },
+  {
+    url: "/dashboard/claude-reviews",
+    what: "Claude Code への差し戻し回数と指摘件数を依頼ごとに見る",
+  },
+  {
+    url: "/dashboard/claude-reviews/[runId]",
+    what: "最初の完了報告と、指摘・修正回答の時系列",
+  },
 ];
 
 export default async function Page() {
@@ -48,6 +56,15 @@ export default async function Page() {
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               {pendingMemos === 0 ? "取り込み待ちは無い" : `取り込み待ち ${pendingMemos} 件`}
+            </p>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/claude-reviews">
+          <Card className="mt-3 transition-colors hover:border-foreground/30">
+            <p className="font-semibold tracking-tight">Claude Code への差し戻しを見る</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Codex が差し戻した回数と指摘を依頼ごとに並べる。手元の記録だけを読む
             </p>
           </Card>
         </Link>

@@ -209,9 +209,9 @@ Vatesteed の運用の中心は **「競馬について対話する」**（1）�
 | --- | --- |
 | きっかけ | レースが終わったあと |
 | 人間 | 走りを見た印象・レース後のコメントの含意を渡す。評価をすり合わせる |
-| AI | 結果を取り込み、そのレースと各出走を評価する |
-| 成果物 | `entry_notes` `race_notes` ほか |
-| 関係するスキル | review-race → race-analysis / entry-analysis |
+| AI | 結果を取り込み、そのレースと各出走を評価したあと、各馬のまとめで結論が変わる項目だけを更新する |
+| 成果物 | `entry_notes` `race_notes` と、差分がある馬の `horse_notes` ほか |
+| 関係するスキル | review-race → race-analysis / entry-analysis / horse-analysis |
 
 ### 4. 自分でも予想する（AI とは別線）
 
@@ -355,8 +355,9 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 ### スキル
 
 **分析する役は、予想（運用2）専用ではない。** 対話（運用1）からも振り返り（運用3）からも
-必要な役を呼ぶ。ただし、複数の出走を総合する `horse-analyst` は、予想するレースの出走馬について
-過去の出走を振り返るときだけ呼ぶ。1つのレースや出走の振り返りでは呼ばない。
+必要な役を呼ぶ。複数の出走を総合する `horse-analyst` は、予想時には出走馬の全体を読み、
+レース後には今回の出走評価で結論が変わる項目だけを読み直す。`entry-analyst` はどちらの場合も、
+担当した1つの出走を越えて馬の性質を作らない。
 
 ### 分析する役（`agent/subagents/`）
 
@@ -398,9 +399,14 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 **horse-analyst は `horse_notes` を自分で書かない。** 対話で作ると決めた評価なので、見立てを
 返してオーケストレーターが書く（[data-model.md](data-model.md#ナレッジの型)）。
 
+レース後の振り返りでも `horse-analyst` を使う。各出走の評価を確定して人間の観察と照合したあと、
+12項目のうち結論が変わるものだけを更新候補として返す。変更対象外の項目を含む全文の書き直しには
+せず、反映前に `verifier` が変更前との違いを確認する。詳しい順序と例外は
+[analysis-quality.md](analysis-quality.md#レース振り返り後の更新)を正本にする。
+
 | 役 | 見るもの | 評価の行き先 |
 | --- | --- | --- |
-| horse-analyst | 予想するレースの出走馬について、過去の出走と血統を総合して評価する | `horse_notes` |
+| horse-analyst | 予想するレースの出走馬を総合して評価し、レース後は結論が変わる項目だけを更新する | `horse_notes` |
 | pedigree-analyst | 血統から適性の素地を読む | `pedigree_notes` `progeny_notes` |
 | jockey-analyst | 騎手の乗り方・仕掛けどころ | `jockey_notes` |
 | trainer-analyst | 厩舎の仕上げ方・ローテ | `trainer_notes` |
@@ -418,7 +424,7 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 | predict-race | 予想 | `race_predictions` `race_prediction_conditions` `ai_predictions` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | plan-bets | 予想 | `ai_bets` `ai_bet_legs` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | intake-memos | 常に働く | `memos` ほか（宛先による） | [agent-design.md のメモの取り込み](agent-design.md#メモの取り込み2026-08-22-決定) |
-| improve-agent | 常に働く | `docs/` `agent/` | [agent-design.md の判断の誤りを直す](agent-design.md#6-判断の誤りを直す) |
+| improve-agent | 常に働く | `docs/` `agent/` | [agent-design.md の判断の誤りを直す](agent-design.md#8-判断の誤りを直す) |
 | write-note-article | 発信 | — | publishing.md |
 | write-zenn-article | 発信 | — | publishing.md |
 | write-x-post | 発信 | — | publishing.md |

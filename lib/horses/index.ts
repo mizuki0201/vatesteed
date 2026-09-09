@@ -3,10 +3,10 @@ export {
   listHorseEntries,
   listHorses,
   type HorseDetail,
-  type HorseEntry,
   type HorseList,
   type HorseSummary,
 } from "./horses.ts";
+export { toHorseEntry, type HorseEntry, type HorseEntryNote } from "./horse-entry.ts";
 export { HORSE_PAGE_SIZE, horsePage, pageNumber, type HorsePage } from "./pagination.ts";
 export {
   DEFAULT_HORSE_STATUS,

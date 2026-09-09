@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
 import { NoteBody, PedigreeNoteBody } from "@/components/screens/note-body";
-import { getHorse, listHorseEntries } from "@/lib/horses";
+import { getHorse, listHorseEntries, type HorseEntryNote } from "@/lib/horses";
 
 export const metadata: Metadata = { title: "馬 — Vatesteed" };
 
@@ -108,13 +108,18 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
                       {entry.cornerPositions ? ` / ${entry.cornerPositions}` : ""}
                     </span>
                   </div>
-                  {entry.note ? (
-                    <div className="mt-3">
-                      <NoteBody author={entry.noteAuthor ?? "AI"} body={entry.note} />
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-muted-foreground">この走りについてはまだ書いていません。</p>
-                  )}
+                  <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
+                    <EntryNote
+                      empty="この出走についてはまだ書いていません。"
+                      label="この馬の内容"
+                      note={entry.entryNote}
+                    />
+                    <EntryNote
+                      empty="このレース全体についてはまだ書いていません。"
+                      label="レース全体の分析"
+                      note={entry.raceNote}
+                    />
+                  </div>
                 </Card>
               </li>
             ))}
@@ -122,5 +127,35 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
         )}
       </Section>
     </PageShell>
+  );
+}
+
+/**
+ * 各レースの欄に出す評価。
+ *
+ * **この馬について書いたものと、レース全体について書いたものを混ぜない。** 範囲が違うので、
+ * レース全体の分析をこの馬だけの評価として読まれると意味が変わる。片方しか保存されていない
+ * ときも両方の見出しを出し、無い方が何なのかが分かるようにする。
+ */
+function EntryNote({
+  label,
+  note,
+  empty,
+}: {
+  readonly label: string;
+  readonly note: HorseEntryNote | null;
+  readonly empty: string;
+}) {
+  return (
+    <div>
+      <p className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
+        {label}
+      </p>
+      {note ? (
+        <NoteBody author={note.author} body={note.body} className="mt-1" />
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">{empty}</p>
+      )}
+    </div>
   );
 }

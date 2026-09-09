@@ -1,5 +1,6 @@
 import { query } from "../db/index.ts";
 import { assertCan } from "../access/index.ts";
+import { toHorseEntry, type HorseEntry } from "./horse-entry.ts";
 import { HORSE_PAGE_SIZE, horsePage } from "./pagination.ts";
 import { DEFAULT_HORSE_STATUS, horseStatusCondition, type HorseStatus } from "./status.ts";
 
@@ -33,24 +34,6 @@ export type HorseDetail = {
     readonly author: string;
     readonly scope: string | null;
   } | null;
-};
-
-export type HorseEntry = {
-  readonly id: string;
-  readonly raceId: string;
-  readonly raceDate: string;
-  readonly raceName: string | null;
-  readonly grade: string | null;
-  readonly track: string;
-  readonly surface: string;
-  readonly distanceM: number;
-  readonly finishPosition: number | null;
-  readonly popularity: number | null;
-  readonly status: string;
-  readonly jockeyName: string | null;
-  readonly cornerPositions: string | null;
-  readonly note: string | null;
-  readonly noteAuthor: string | null;
 };
 
 /** 一覧の1ページぶん。件数はページの中ではなく、条件に当たる全頭を指す。 */
@@ -167,32 +150,18 @@ export async function listHorseEntries(horseId: string): Promise<readonly HorseE
             r.id AS race_id, r.race_date, r.race_name, r.grade,
             c.track, c.surface, c.distance_m,
             j.name AS jockey_name,
-            n.body AS note_body, n.author AS note_author
+            en.body AS entry_note_body, en.author AS entry_note_author,
+            rn.body AS race_note_body, rn.author AS race_note_author
        FROM entries e
        JOIN races r ON r.id = e.race_id
        JOIN courses c ON c.id = r.course_id
        LEFT JOIN jockeys j ON j.id = e.jockey_id
-       LEFT JOIN entry_notes n ON n.entry_id = e.id
+       LEFT JOIN entry_notes en ON en.entry_id = e.id
+       LEFT JOIN race_notes rn ON rn.race_id = r.id
       WHERE e.horse_id = $1
       ORDER BY r.race_date DESC`,
     [horseId],
   );
 
-  return rows.map((row) => ({
-    id: String(row.id),
-    raceId: String(row.race_id),
-    raceDate: String(row.race_date),
-    raceName: (row.race_name as string | null) ?? null,
-    grade: (row.grade as string | null) ?? null,
-    track: String(row.track),
-    surface: String(row.surface),
-    distanceM: Number(row.distance_m),
-    finishPosition: (row.finish_position as number | null) ?? null,
-    popularity: (row.popularity as number | null) ?? null,
-    status: String(row.status),
-    jockeyName: (row.jockey_name as string | null) ?? null,
-    cornerPositions: (row.corner_positions as string | null) ?? null,
-    note: (row.note_body as string | null) ?? null,
-    noteAuthor: (row.note_author as string | null) ?? null,
-  }));
+  return rows.map(toHorseEntry);
 }

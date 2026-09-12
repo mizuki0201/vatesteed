@@ -5,8 +5,9 @@
  * そこで、担当する種類の一般ルールと参考例を読んだことを、返答の保存しない側へ決まった形で
  * 残す（`docs/analysis-quality.md` の「実行時の確認」）。
  *
- * ここで見るのは形と対応だけで、分析の中身は見ない。**実行確認は分析が正しいことの証明では
- * なく、何を基準に作り、何を基準に検証したかを実行ごとに確かめるためのもの**である。
+ * 実行確認の形と対応に加え、血統分析の保存部分に分析結果ではない材料不足の報告や一般的な注意が
+ * 混ざっていないかを機械的に見る。事実から読みが出ているかなど、機械で決められない中身は
+ * `verifier` が見る。
  */
 
 import {
@@ -31,6 +32,33 @@ export const UNSAVED_PART_HEADING = "保存しないメモ";
 
 /** 実行確認の行の書き出し。 */
 export const EXECUTION_CONFIRMATION_PREFIX = "実行確認:";
+
+/**
+ * 血統分析の保存部分へ出してはいけない書き方。
+ *
+ * これらは慎重さではなく、分析から読みを出せなかったことの報告になりやすい。表現だけを変えて
+ * 通すための網羅的な辞書ではなく、実際に保存された失敗を保存前に止めるための確認である。
+ */
+export const PEDIGREE_EMPTY_CONCLUSION_PATTERNS: readonly RegExp[] = [
+  /(?:材料|根拠|実例|資料|情報)(?:が|は|も).{0,12}(?:無い|ない|薄い|乏しい|弱い|足りない|不足)/,
+  /(?:何も|までは)(?:言えない|読めない|分からない|わからない|決められない|判断できない)/,
+  /(?:断定|判断|確定|固定|限定|一般化|特定)(?:は|も)?(?:できない|できず|しない)/,
+  /(?:語れない|読み取れない|評価できない|見極められない|分からない|わからない|言い切れない)/,
+  /(?:未確定|不明(?:である|だ)?)/,
+  /血統.{0,24}(?:決まらない|決められない|分からない|わからない)/,
+  /血量.{0,30}(?:能力|気性|適性).{0,20}(?:言えない|決まらない|決められない|判断できない|言わない)/,
+  /(?:可能性|余地)(?:は|を)(?:否定しない|消えない)/,
+  /(?:とは|とまでは)(?:言えない|断定できない)/,
+];
+
+/** 血統分析の保存部分から、分析結果ではない留保が入った行を返す。 */
+export function findPedigreeEmptyConclusions(text: string): readonly string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => PEDIGREE_EMPTY_CONCLUSION_PATTERNS.some((pattern) => pattern.test(line)));
+}
 
 /**
  * 実行確認の1行を組む。
@@ -177,6 +205,12 @@ export function checkExecutionConfirmations(input: {
   const problems: string[] = [];
   const parts = splitAnalysisResponse(input.response);
   const { confirmations, malformedLines } = parseExecutionConfirmations(input.response);
+
+  if (parts.hasSaved && input.kinds.includes("pedigree")) {
+    for (const line of findPedigreeEmptyConclusions(parts.saved)) {
+      problems.push(`血統分析の保存部分に、分析結果ではない留保がある: ${line}`);
+    }
+  }
 
   for (const line of malformedLines) {
     problems.push(`実行確認の形が違う: ${line}`);

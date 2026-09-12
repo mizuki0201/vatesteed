@@ -15,6 +15,7 @@ import {
   splitReferenceSections,
   type ReferenceExampleKind,
 } from "./reference-examples.ts";
+import { findPedigreeEmptyConclusions } from "../analysis-confirmation/index.ts";
 
 const REPO_ROOT = new URL("../../", import.meta.url);
 
@@ -54,6 +55,17 @@ test("血統分析の参考例は本文と調べた範囲に分かれている",
   assert.ok(example.body.includes("概要"));
   assert.ok(example.scope.length > 0);
   assert.ok(!example.body.includes(example.scope));
+});
+
+test("血統分析の参考例は、材料不足の報告を使わずに十分な情報量を持つ", () => {
+  const example = parsePedigreeReferenceExample(readExample("pedigree"));
+
+  assert.deepEqual(findPedigreeEmptyConclusions(example.body), []);
+  assert.ok(example.body.length >= 4_000, `血統分析の本文が${example.body.length}文字しかない`);
+
+  for (const heading of ["概要", "母と牝系", "産駒の傾向", "母父と配合", "系統とクロス", "適性の素地"]) {
+    assert.ok(example.body.includes(`## ${heading}`), `血統分析の参考例に「${heading}」が無い`);
+  }
 });
 
 test("出走の分析の参考例は14件が日付順に1件ずつ入っている", () => {

@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   ANALYSIS_KIND_LABELS,
   checkExecutionConfirmations,
+  findPedigreeEmptyConclusions,
   formatExecutionConfirmation,
   parseAnalysisConfirmationArgs,
   parseExecutionConfirmations,
@@ -41,6 +42,24 @@ function entryResponse(confirmation: string): string {
   ].join("\n");
 }
 
+/** 血統分析を1件返した形。 */
+function pedigreeResponse(body: string): string {
+  return [
+    "## 保存する本文",
+    "",
+    body,
+    "",
+    "## 保存する範囲",
+    "",
+    "父系・母系とも6代。父の子は80頭で、対象馬を除いて79頭。",
+    "",
+    "## 保存しないメモ",
+    "",
+    `- ${formatExecutionConfirmation("pedigree")}`,
+    "",
+  ].join("\n");
+}
+
 test("実行確認は種類と2つのパスを同じ形で書く", () => {
   assert.equal(
     formatExecutionConfirmation("horse"),
@@ -71,6 +90,74 @@ test("そろっている実行確認は通る", () => {
   });
 
   assert.deepEqual(check, { ok: true, problems: [] });
+});
+
+test("血統分析は事実と読みだけなら通る", () => {
+  const check = checkExecutionConfirmations({
+    kinds: ["pedigree"],
+    response: pedigreeResponse(
+      "母は芝2000メートルで3勝し、半兄も芝1800メートルで勝ち上がった。" +
+        "父の子も芝1800から2200メートルに勝ち鞍が集まり、両側から芝中距離の持続力が重なる。",
+    ),
+  });
+
+  assert.deepEqual(check, { ok: true, problems: [] });
+});
+
+test("血統分析の保存部分に材料不足の報告があれば保存しない", () => {
+  const phrases = [
+    "気性は材料が無い。",
+    "位置取りは材料が薄い。",
+    "この条件については何も言えない。",
+    "距離の上限までは決められない。",
+    "血統だけで能力は決まらない。",
+    "ダートの可能性は否定しない。",
+    "重馬場が向かないとは言えない。",
+    "きょうだい1頭だけでは母が伝える距離を一般化できない。",
+    "古馬での成長は未確定である。",
+    "小回りへの明確な根拠はない。",
+    "芝だけに限定はできない。",
+    "配合固有の傾向は語れない。",
+    "どちらに優位かは分からない。",
+  ];
+
+  for (const phrase of phrases) {
+    const check = checkExecutionConfirmations({
+      kinds: ["pedigree"],
+      response: pedigreeResponse(phrase),
+    });
+
+    assert.equal(check.ok, false, phrase);
+    assert.ok(
+      check.problems.some((problem) => problem.includes("分析結果ではない留保")),
+      phrase,
+    );
+  }
+});
+
+test("材料不足の検査は血統分析の保存部分だけに当てる", () => {
+  assert.deepEqual(findPedigreeEmptyConclusions("気性は材料が無い。"), ["気性は材料が無い。"]);
+
+  const entryCheck = checkExecutionConfirmations({
+    kinds: ["entry"],
+    response: entryResponse(formatExecutionConfirmation("entry")).replace(
+      "前半3Fは35.2で流れ、2番手から直線で抜け出した。",
+      "位置取りだけでは敗因を断定できない。",
+    ),
+  });
+
+  assert.deepEqual(entryCheck, { ok: true, problems: [] });
+});
+
+test("血統分析は保存する範囲に入った材料不足の報告も保存しない", () => {
+  const response = pedigreeResponse("母と父の子から芝中距離の持続力が重なる。").replace(
+    "父系・母系とも6代。父の子は80頭で、対象馬を除いて79頭。",
+    "父系は6代。母系は資料が不足している。",
+  );
+  const check = checkExecutionConfirmations({ kinds: ["pedigree"], response });
+
+  assert.equal(check.ok, false);
+  assert.ok(check.problems.some((problem) => problem.includes("分析結果ではない留保")));
 });
 
 test("実行確認が無ければ保存しない", () => {

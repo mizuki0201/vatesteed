@@ -85,6 +85,26 @@ RETURNING id;
 **全頭に行を作る。** 無印は `mark_id` を null にする。印を付けない馬にも、なぜ付けないかを
 `rationale` に書く。
 
+### 印を付ける頭数を先に決める
+
+**◎、◯、▲、△、☆の合計は、出走頭数の約4割とし、最大でも7頭にする。**
+18頭立てでは◎1頭、◯1頭、▲1頭、△2〜3頭、☆1〜2頭を基準にし、合計は最大7頭とする。
+◎、◯、▲は各1頭まで。出走頭数が少ないときは△と☆を評価順に減らす。
+
+保存前に、その時点で`status = '出走'`の出走頭数をDBから数える。
+
+```sql
+SELECT count(*) AS entry_count
+FROM entries
+WHERE race_id = $1 AND status = '出走';
+```
+
+印を付けられる頭数は`min(7, round(entry_count * 0.4))`。出走頭数の4割を最も近い整数へ丸める。
+18頭立てなら最大7頭、12頭立てなら最大5頭、11頭立てなら最大4頭になる。これは上限であって、
+上限まで印を付ける目標ではない。
+全頭の評価を並べたあと、上限を超えた分を無印へ戻してから保存する。消しの「ー」は買い目の候補を
+示す印ではないので、この合計には含めない。
+
 | 印 | `mark_id` |
 | --- | --- |
 | 本命 ◎ / 対抗 ◯ / 単穴 ▲ / 連下 △ / 大穴 ☆ / 消し ー | `marks` を引く |
@@ -93,6 +113,19 @@ RETURNING id;
 写しにしない。展開との噛み合い、条件替わり、斤量、乗り替わり、叩きかどうかが効く。
 
 書き込む先は `ai_predictions`（`entry_id` ごとに1行、`predicted_at` は now()）。
+
+保存後に全頭の行数と、◎、◯、▲、△、☆を付けた頭数を読み直す。後者が上限を超えていたら完了に
+しない。
+
+```sql
+SELECT
+  count(*) AS prediction_count,
+  count(*) FILTER (WHERE m.symbol IN ('◎', '◯', '▲', '△', '☆')) AS marked_count
+FROM entries e
+JOIN ai_predictions p ON p.entry_id = e.id
+LEFT JOIN marks m ON m.id = p.mark_id
+WHERE e.race_id = $1 AND e.status = '出走';
+```
 
 ## 3. 渡す
 

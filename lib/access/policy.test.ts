@@ -24,6 +24,13 @@ describe("can", () => {
     assert.equal(can("member", "notes.raw"), false);
   });
 
+  it("馬の現役と引退を切り替えられるのは owner だけ", () => {
+    assert.equal(can("owner", "horses.retirement"), true);
+    assert.equal(can("friend", "horses.retirement"), false);
+    assert.equal(can("member", "horses.retirement"), false);
+    assert.equal(can("public", "horses.retirement"), false);
+  });
+
   it("public のものは誰でも見られる", () => {
     for (const level of ACCESS_LEVELS) {
       assert.equal(can(level, "about"), true, `${level} が about を見られない`);

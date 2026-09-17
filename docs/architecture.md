@@ -246,7 +246,8 @@ Neon をプロジェクトに接続する際の Environments は **Development /
 有効にするか、Environments から Preview を外すかを選ぶ。
 
 **2つのうち、書き込み経路の側は 2026-08-22 に当たった。** `/dashboard/record-memo` から
-[`memos`](data-model.md#memos) に入る（[product.md の画面](product.md#画面)）。**まだ見直さないのは、
+[`memos`](data-model.md#memos) に入る。2026-09-17 からは、馬の詳細画面から `horses.retired_at` も
+書き換わる（どちらも [product.md の画面](product.md#画面)）。**まだ見直さないのは、
 main へ直接コミットしていて Preview デプロイが発生しないため。** PR を出すようになった時点で、
 この判断は期限切れになる。
 

@@ -2,6 +2,7 @@ export {
   getHorse,
   listHorseEntries,
   listHorses,
+  setHorseRetirement,
   type HorseDetail,
   type HorseEntry,
   type HorseList,
@@ -18,3 +19,10 @@ export {
   horseStatusLabel,
   type HorseStatus,
 } from "./status.ts";
+export {
+  nextRetirementTarget,
+  parseRetirementInput,
+  RETIREMENT_TARGET_LABELS,
+  type RetirementInput,
+  type RetirementTarget,
+} from "./retirement.ts";

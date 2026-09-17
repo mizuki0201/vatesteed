@@ -3,7 +3,15 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
 import { NoteBody, PedigreeNoteBody } from "@/components/screens/note-body";
-import { getHorse, listHorseEntries } from "@/lib/horses";
+import { HorseRetirementMenu } from "@/components/screens/horse-retirement-menu";
+import { can } from "@/lib/access";
+import { getViewer } from "@/lib/auth";
+import {
+  getHorse,
+  listHorseEntries,
+  nextRetirementTarget,
+  RETIREMENT_TARGET_LABELS,
+} from "@/lib/horses";
 
 export const metadata: Metadata = { title: "馬 — Vatesteed" };
 
@@ -15,8 +23,22 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 
   const entries = await listHorseEntries(id);
 
+  // 海外の馬は現役と引退に分けていないので出さない（docs/data-model.md#horses）
+  const canChangeRetirement = can(await getViewer(), "horses.retirement") && !horse.isOverseas;
+  const retirementTarget = nextRetirementTarget(horse.retiredAt);
+
   return (
     <PageShell
+      actions={
+        canChangeRetirement ? (
+          <HorseRetirementMenu
+            horseId={horse.id}
+            horseName={horse.name}
+            label={RETIREMENT_TARGET_LABELS[retirementTarget]}
+            target={retirementTarget}
+          />
+        ) : null
+      }
       back={{ href: "/horses", label: "馬の一覧" }}
       lead={
         <>

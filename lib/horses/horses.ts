@@ -2,6 +2,7 @@ import { query } from "../db/index.ts";
 import { assertCan } from "../access/index.ts";
 import { HORSE_PAGE_SIZE, horsePage } from "./pagination.ts";
 import { DEFAULT_HORSE_STATUS, horseStatusCondition, type HorseStatus } from "./status.ts";
+import { parseRetirementInput } from "./retirement.ts";
 
 /** 馬の画面が読むもの。 */
 
@@ -25,6 +26,7 @@ export type HorseDetail = {
   readonly trainerId: string | null;
   readonly trainerName: string | null;
   readonly retiredAt: string | null;
+  readonly isOverseas: boolean;
   readonly sireName: string | null;
   readonly damName: string | null;
   readonly note: { readonly body: string; readonly author: string } | null;
@@ -118,7 +120,7 @@ export async function getHorse(id: string): Promise<HorseDetail | undefined> {
   await assertCan("horses");
 
   const { rows } = await query(
-    `SELECT h.id, h.name, h.name_kana, h.sex, h.birth_year, h.retired_at,
+    `SELECT h.id, h.name, h.name_kana, h.sex, h.birth_year, h.retired_at, h.is_overseas,
             t.id AS trainer_id, t.name AS trainer_name,
             sire.name AS sire_name, dam.name AS dam_name,
             n.body AS note_body, n.author AS note_author,
@@ -145,6 +147,7 @@ export async function getHorse(id: string): Promise<HorseDetail | undefined> {
     trainerId: row.trainer_id === null ? null : String(row.trainer_id),
     trainerName: (row.trainer_name as string | null) ?? null,
     retiredAt: (row.retired_at as string | null) ?? null,
+    isOverseas: Boolean(row.is_overseas),
     sireName: (row.sire_name as string | null) ?? null,
     damName: (row.dam_name as string | null) ?? null,
     note: row.note_body ? { body: String(row.note_body), author: String(row.note_author) } : null,
@@ -156,6 +159,41 @@ export async function getHorse(id: string): Promise<HorseDetail | undefined> {
         }
       : null,
   };
+}
+
+/**
+ * 馬を現役か引退に切り替える。**owner だけが呼べる。**
+ *
+ * Server Function は画面を通らない POST からも呼べるので、**認証はこの中で確かめる**
+ * （`recordMemo` と同じ）。
+ *
+ * 引退にするときは、その日（日本時間）を引退日として入れる。**既に日付が入っていれば
+ * 書き換えない**（二重に送られても、先に確認した日が残る）。現役に戻すときは null にする。
+ *
+ * **海外の馬は書き換えない。** 現役と引退に分けていないため（docs/data-model.md#horses）。
+ * 当たる馬が無ければ `ok: false` を返す。
+ */
+export async function setHorseRetirement(input: {
+  readonly horseId: unknown;
+  readonly target: unknown;
+}): Promise<{ readonly ok: boolean }> {
+  await assertCan("horses.retirement");
+
+  const parsed = parseRetirementInput(input.horseId, input.target);
+
+  if (!parsed.ok) return { ok: false };
+
+  const { rowCount } = await query(
+    `UPDATE horses
+        SET retired_at = CASE
+              WHEN $2::boolean THEN COALESCE(retired_at, (now() AT TIME ZONE 'Asia/Tokyo')::date)
+              ELSE NULL
+            END
+      WHERE id = $1 AND is_overseas = false`,
+    [parsed.horseId, parsed.target === "retired"],
+  );
+
+  return { ok: (rowCount ?? 0) > 0 };
 }
 
 /** その馬の出走を、新しい順に。 */

@@ -126,7 +126,13 @@ export function RecordPicker({
               <li key={option.id} role="option" aria-selected={false}>
                 <button
                   className="w-full rounded px-2 py-1.5 text-left hover:bg-accent"
-                  onMouseDown={(event) => event.preventDefault()}
+                  // 指が触れた時点で選ぶ。スマホでは、触れた直後に入力欄からフォーカスが外れて
+                  // 候補の一覧が消えるため、そのあとのクリックでは届かない
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    choose(option);
+                  }}
+                  // 指やマウスを使わずキーボードで押したとき用
                   onClick={() => choose(option)}
                   type="button"
                 >

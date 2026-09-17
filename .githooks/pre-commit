@@ -10,5 +10,10 @@
 # 生成に失敗したらコミットを止める。古い生成物が入るより、気づける方がよい。
 set -e
 
-mise exec -- pnpm --silent gen:agents
+# mise exec で包まない。Node は package.json の各スクリプトが先頭で shims を PATH の手前に
+# 足して切り替えていて、mise exec は効かないため（AGENTS.md の「環境」）。包むと、mise の
+# 設定を読めない環境ではコミットごと止まる。
+#
+# フックのシェルには pnpm が無いので、ここでも shims を PATH の手前に足す。
+PATH="$HOME/.local/share/mise/shims:$PATH" pnpm --silent gen:agents
 git add .claude/agents

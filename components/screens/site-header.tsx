@@ -2,6 +2,7 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { can, type Capability } from "@/lib/access";
 import { getViewer } from "@/lib/auth";
+import { SiteMenu } from "./site-menu";
 
 /**
  * 全画面の上に出るナビ。
@@ -73,34 +74,28 @@ export async function SiteHeader() {
             </>
           )}
         </span>
-        <details className="relative ml-auto sm:hidden">
-          <summary className="cursor-pointer list-none rounded-md border border-border px-3 py-1.5 hover:bg-accent">
-            <span aria-hidden="true">☰</span>
-            <span className="sr-only">メニュー</span>
-          </summary>
-          <div className="absolute right-0 z-10 mt-2 flex w-52 flex-col gap-1 rounded-lg border border-border bg-card p-2 shadow-lg">
-            {items.map((item) => (
-              <Link className="rounded px-3 py-2 hover:bg-accent" href={item.href} key={item.href}>
-                {item.label}
-              </Link>
-            ))}
-            <Link className="rounded px-3 py-2 hover:bg-accent" href="/tech">
-              技術情報
+        <SiteMenu>
+          {items.map((item) => (
+            <Link className="rounded px-3 py-2 hover:bg-accent" href={item.href} key={item.href}>
+              {item.label}
             </Link>
-            <Link className="rounded px-3 py-2 hover:bg-accent" href="/about">
-              Vatesteedについて
+          ))}
+          <Link className="rounded px-3 py-2 hover:bg-accent" href="/tech">
+            技術情報
+          </Link>
+          <Link className="rounded px-3 py-2 hover:bg-accent" href="/about">
+            Vatesteedについて
+          </Link>
+          {viewer === "public" ? (
+            <Link className="rounded px-3 py-2 hover:bg-accent" href="/login">
+              ログイン
             </Link>
-            {viewer === "public" ? (
-              <Link className="rounded px-3 py-2 hover:bg-accent" href="/login">
-                ログイン
-              </Link>
-            ) : (
-              <div className="rounded px-3 py-2 hover:bg-accent">
-                <LogoutButton />
-              </div>
-            )}
-          </div>
-        </details>
+          ) : (
+            <div className="rounded px-3 py-2 hover:bg-accent">
+              <LogoutButton />
+            </div>
+          )}
+        </SiteMenu>
       </nav>
     </header>
   );

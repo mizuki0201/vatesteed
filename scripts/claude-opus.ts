@@ -1,12 +1,15 @@
 /**
  * Claude Code の入口。
  *
- *   pnpm claude:opus -- --check-auth
  *   pnpm claude:opus -- --task docs/tasks/<タスク名>.md
  *   pnpm claude:opus -- --resume <実行記録のID> --task docs/tasks/<タスク名>.md
  *   pnpm claude:opus -- --restart --task docs/tasks/<タスク名>.md
  *
  * 手順は docs/claude-code-bridge.md の「実行の単位と再開」が正本。
+ *
+ * **接続確認は単独では起動できない。** 最初の新規実行だけが、タスクの検証と排他確認を済ませた
+ * 直後に接続確認を行い、成功したらそのまま本実行へ進む（同じ docs の
+ * 「Claude Codeを起動する直前の接続確認」）。
  *
  * レビュー修正の往復を記録するのも、この入口の責務である。**Claude Code へ渡す依頼文には
  * 記録のことを一切書かない**（docs/claude-code-bridge.md の「レビューと修正回答の記録」）。
@@ -27,6 +30,7 @@ import {
   loadTaskContract,
   parseClaudeCommand,
   runClaudeOpus,
+  shouldVerifyAuth,
   type TaskContract,
 } from "../lib/claude-code/index.ts";
 import {
@@ -91,23 +95,10 @@ function createProgressWriter(): (progress: ClaudeProgress) => void {
   };
 }
 
-/** 検証済みのタスクから実行処理へ渡す値を組み立てる。接続確認にはタスクが無い。 */
+/** 検証済みのタスクから実行処理へ渡す値を組み立てる。 */
 async function buildCommand(
   parsed: ClaudeCliCommand,
-): Promise<{ command: ClaudeCommand; task: TaskContract | null }> {
-  if (parsed.kind === "check-auth") {
-    return {
-      command: {
-        kind: "check-auth",
-        prompt: "Return exactly: AUTH_OK",
-        taskPath: null,
-        mode: null,
-        executorRole: null,
-      },
-      task: null,
-    };
-  }
-
+): Promise<{ command: ClaudeCommand; task: TaskContract }> {
   const task = await loadTaskContract(process.cwd(), parsed.taskPath);
   assertClaudeExecutableTask(task);
   const shared = {
@@ -139,28 +130,23 @@ try {
     runProcess,
     reopenCompleted: parsed.kind === "resume",
     allowExistingTaskRun: parsed.kind === "restart",
+    verifyAuth: shouldVerifyAuth(parsed),
     onProgress: createProgressWriter(),
     // 差し戻して再開すると決まった時点で、タスクMarkdownの「受け入れ結果」から指摘を読む。
-    onSendBack:
-      task === null
-        ? undefined
-        : async (run) => {
-            await openReviewRound({ dir: reviewsDir, runId: run.runId, taskBody: task.body });
-          },
-    onCompleted:
-      task === null
-        ? undefined
-        : async (run) => {
-            if (run.result === null) return;
-            await recordReviewReport({
-              dir: reviewsDir,
-              runId: run.runId,
-              taskPath: task.taskPath,
-              taskTitle: task.title,
-              mode: task.mode,
-              report: run.result,
-            });
-          },
+    onSendBack: async (run) => {
+      await openReviewRound({ dir: reviewsDir, runId: run.runId, taskBody: task.body });
+    },
+    onCompleted: async (run) => {
+      if (run.result === null) return;
+      await recordReviewReport({
+        dir: reviewsDir,
+        runId: run.runId,
+        taskPath: task.taskPath,
+        taskTitle: task.title,
+        mode: task.mode,
+        report: run.result,
+      });
+    },
   });
 
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);

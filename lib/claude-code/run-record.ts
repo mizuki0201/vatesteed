@@ -32,11 +32,11 @@ export type ClaudeRunRecord = {
   runId: string;
   /** Claude Code が返したセッションID。再開に使う。取れなければ null */
   sessionId: string | null;
-  /** 実行するタスクMarkdown。接続確認ではnull */
+  /** 実行するタスクMarkdown。旧形式の実行記録ではnull */
   taskPath: string | null;
-  /** タスクのモード。接続確認と旧形式の実行記録ではnull */
+  /** タスクのモード。旧形式の実行記録ではnull */
   mode: TaskMode | null;
-  /** タスクで指定された実行役。接続確認と旧形式の実行記録ではnull */
+  /** タスクで指定された実行役。旧形式の実行記録ではnull */
   executorRole: string | null;
   state: ClaudeRunState;
   /** Claude Code プロセスの終了コード。シグナルで落ちたときは null */

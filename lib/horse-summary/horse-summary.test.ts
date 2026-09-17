@@ -230,6 +230,80 @@ test("実行確認が保存する本文に混ざった返答からも、まと�
   assert.deepEqual(applied.reasons, ["実行確認が保存する本文に混ざっている"]);
 });
 
+test("まだ経験していない条件を書いた項目からは、まとめを作らない", () => {
+  const applied = applyHorseSummaryResponse({
+    currentBody: CURRENT,
+    author: "AI",
+    response: [
+      "## 保存する本文",
+      "",
+      "## 脚質",
+      "",
+      "中団から差す形が続いており、後ろから運んだ経験は無い。",
+      "",
+      "## 保存しないメモ",
+      "",
+      `- ${CONFIRMATION}`,
+      "",
+    ].join("\n"),
+  });
+
+  assert.equal(applied.state, "blocked");
+  assert.deepEqual(applied.reasons, [
+    "馬の総合分析の保存部分に、まだ経験していない条件の記述がある:" +
+      " 中団から差す形が続いており、後ろから運んだ経験は無い。",
+  ]);
+});
+
+test("保存しないメモのまだ経験していない条件では、まとめを止めない", () => {
+  const applied = applyHorseSummaryResponse({
+    currentBody: CURRENT,
+    author: "AI",
+    response: [
+      "## 保存する本文",
+      "",
+      "## 距離適性",
+      "",
+      "2400mでも最後まで脚を使えた。",
+      "",
+      "## 保存しないメモ",
+      "",
+      "- 2500m以上は経験していないので、次に延長するなら読み直す",
+      `- ${CONFIRMATION}`,
+      "",
+    ].join("\n"),
+  });
+
+  assert.equal(applied.state, "updated");
+});
+
+test("既存本文に残っている記述は、別の項目の差し替えを止めない", () => {
+  const currentWithOldText = CURRENT.replace(
+    "輸送で減っても走れている。",
+    "輸送で減っても走れている。多頭数は未経験である。",
+  );
+
+  const applied = applyHorseSummaryResponse({
+    currentBody: currentWithOldText,
+    author: "AI",
+    response: [
+      "## 保存する本文",
+      "",
+      "## 距離適性",
+      "",
+      "2400mでも最後まで脚を使えた。",
+      "",
+      "## 保存しないメモ",
+      "",
+      `- ${CONFIRMATION}`,
+      "",
+    ].join("\n"),
+  });
+
+  assert.equal(applied.state, "updated");
+  assert.ok(applied.state === "updated" && applied.body.includes("多頭数は未経験である。"));
+});
+
 test("返答の保存する本文から、更新する項目を読む", () => {
   const parsed = parseHorseSummaryUpdates(
     [

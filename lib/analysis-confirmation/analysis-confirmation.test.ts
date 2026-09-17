@@ -5,8 +5,12 @@ import test from "node:test";
 import {
   ANALYSIS_KIND_LABELS,
   checkExecutionConfirmations,
+  findAmbiguousSubjects,
+  findHorseUntriedConditions,
   findPedigreeEmptyConclusions,
+  formatAmbiguousSubjectProblem,
   formatExecutionConfirmation,
+  HUMAN_OBSERVATION_WORDING,
   parseAnalysisConfirmationArgs,
   parseExecutionConfirmations,
   splitAnalysisResponse,
@@ -56,6 +60,22 @@ function pedigreeResponse(body: string): string {
     "## 保存しないメモ",
     "",
     `- ${formatExecutionConfirmation("pedigree")}`,
+    "",
+  ].join("\n");
+}
+
+/** 馬の総合分析を1件返した形。 */
+function horseResponse(body: string): string {
+  return [
+    "## 保存する本文",
+    "",
+    "## 概要",
+    "",
+    body,
+    "",
+    "## 保存しないメモ",
+    "",
+    `- ${formatExecutionConfirmation("horse")}`,
     "",
   ].join("\n");
 }
@@ -158,6 +178,201 @@ test("血統分析は保存する範囲に入った材料不足の報告も保�
 
   assert.equal(check.ok, false);
   assert.ok(check.problems.some((problem) => problem.includes("分析結果ではない留保")));
+});
+
+test("馬の総合分析は、確かめた内容だけなら通る", () => {
+  const bodies = [
+    "重賞初挑戦で勝ち、同世代の上位と互角に戦えることを示した。",
+    "初めての阪神で能力を示し、坂のあるコースでも脚が鈍らなかった。",
+    "道悪で反応が鈍り、時計のかかる馬場では前が止まらない流れに乗れなかった。",
+    "使われるごとに折り合いがつき、経験を重ねて発馬も安定した。",
+    "58キロを背負った前走で、同じ相手に半馬身先着した。",
+  ];
+
+  for (const body of bodies) {
+    assert.deepEqual(
+      checkExecutionConfirmations({ kinds: ["horse"], response: horseResponse(body) }),
+      { ok: true, problems: [] },
+      body,
+    );
+  }
+});
+
+test("馬の総合分析の保存部分に、まだ経験していない条件があれば保存しない", () => {
+  const bodies = [
+    "後ろから運んだ経験は無い。",
+    "重い斤量を課された経験がない。",
+    "2000メートルを超える距離を経験していない。",
+    "多頭数は未経験である。",
+    "逃げた経験はまだなく、戦法の幅を確かめられていない。",
+    "洋芝についての材料が無い。",
+    "小回りのコースを使われた経験はなかった。",
+  ];
+
+  for (const body of bodies) {
+    const check = checkExecutionConfirmations({
+      kinds: ["horse"],
+      response: horseResponse(body),
+    });
+
+    assert.equal(check.ok, false, body);
+    assert.ok(
+      check.problems.some((problem) =>
+        problem.startsWith("馬の総合分析の保存部分に、まだ経験していない条件の記述がある"),
+      ),
+      body,
+    );
+  }
+});
+
+test("まだ経験していない条件の検査は、馬の総合分析の保存部分だけに当てる", () => {
+  assert.deepEqual(findHorseUntriedConditions("後ろから運んだ経験は無い。"), [
+    "後ろから運んだ経験は無い。",
+  ]);
+
+  const inNote = horseResponse("3コーナーから位置を上げ、最後まで脚を使った。").replace(
+    "- 実行確認:",
+    "- ダートは経験していないので、条件が替わったら読み直す\n- 実行確認:",
+  );
+
+  assert.deepEqual(checkExecutionConfirmations({ kinds: ["horse"], response: inNote }), {
+    ok: true,
+    problems: [],
+  });
+
+  const entryCheck = checkExecutionConfirmations({
+    kinds: ["entry"],
+    response: entryResponse(formatExecutionConfirmation("entry")).replace(
+      "前半3Fは35.2で流れ、2番手から直線で抜け出した。",
+      "この距離を経験していない。",
+    ),
+  });
+
+  assert.deepEqual(entryCheck, { ok: true, problems: [] });
+});
+
+/** 朝日杯セントライト記念で実際に保存された1文。出所の書き方だけを直す前の形。 */
+const OBSERVATION_LINE_AS_SAVED =
+  "本人の観察では、次の出走を見越して途中で無理に動かさなかった結果であり、" +
+  "6着だけで悲観しすぎなくてよいと見ている。";
+
+/** 同じ1文を、統一した出所の書き方へ直した形。 */
+const OBSERVATION_LINE_FIXED = OBSERVATION_LINE_AS_SAVED.replace(
+  "本人の観察では",
+  HUMAN_OBSERVATION_WORDING,
+);
+
+test("人間の観察の出所が統一した書き方なら通る", () => {
+  const entryCheck = checkExecutionConfirmations({
+    kinds: ["entry"],
+    response: entryResponse(formatExecutionConfirmation("entry")).replace(
+      "前半3Fは35.2で流れ、2番手から直線で抜け出した。",
+      OBSERVATION_LINE_FIXED,
+    ),
+  });
+
+  assert.deepEqual(entryCheck, { ok: true, problems: [] });
+  assert.deepEqual(findAmbiguousSubjects(OBSERVATION_LINE_FIXED), []);
+
+  assert.deepEqual(
+    checkExecutionConfirmations({
+      kinds: ["horse"],
+      response: horseResponse(OBSERVATION_LINE_FIXED),
+    }),
+    { ok: true, problems: [] },
+  );
+});
+
+test("「本人」と文字が重なるだけの「日本人」は通す", () => {
+  const line = "日本人騎手へ乗り替わった前走は、道中の位置を1つ前へ取れていた。";
+
+  assert.deepEqual(findAmbiguousSubjects(line), []);
+  assert.deepEqual(
+    checkExecutionConfirmations({
+      kinds: ["entry"],
+      response: entryResponse(formatExecutionConfirmation("entry")).replace(
+        "前半3Fは35.2で流れ、2番手から直線で抜け出した。",
+        line,
+      ),
+    }),
+    { ok: true, problems: [] },
+  );
+
+  // 「日本人」を外したあとに「本人」が残る行は止める。
+  const mixed = "日本人騎手へ乗り替わり、騎手本人も手応えに余裕があったと述べている。";
+  assert.deepEqual(findAmbiguousSubjects(mixed), [mixed]);
+});
+
+test("誰を指すか分からない主語がある本文は保存しない", () => {
+  const lines = [
+    OBSERVATION_LINE_AS_SAVED,
+    OBSERVATION_LINE_AS_SAVED.replace("本人の観察では", "ユーザーの観察では"),
+    "騎手本人は直線を向いた地点で手応えに余裕があったと述べている。",
+    "父本人は芝の中距離で重賞を3勝している。",
+  ];
+
+  for (const line of lines) {
+    const entryCheck = checkExecutionConfirmations({
+      kinds: ["entry"],
+      response: entryResponse(formatExecutionConfirmation("entry")).replace(
+        "前半3Fは35.2で流れ、2番手から直線で抜け出した。",
+        line,
+      ),
+    });
+
+    assert.equal(entryCheck.ok, false, line);
+    assert.ok(entryCheck.problems.includes(formatAmbiguousSubjectProblem(line)), line);
+
+    const horseCheck = checkExecutionConfirmations({
+      kinds: ["horse"],
+      response: horseResponse(line),
+    });
+
+    assert.equal(horseCheck.ok, false, line);
+    assert.deepEqual(findAmbiguousSubjects(line), [line]);
+  }
+});
+
+test("止めた理由が、直し方を人間の観察へ決め打ちしない", () => {
+  // 「本人」が騎手を指している文。人間の観察へ直すと、別の人の話にすり替わる。
+  const line = "本人は直線を向いた地点で手応えに余裕があったと述べている。";
+  const check = checkExecutionConfirmations({
+    kinds: ["entry"],
+    response: entryResponse(formatExecutionConfirmation("entry")).replace(
+      "前半3Fは35.2で流れ、2番手から直線で抜け出した。",
+      line,
+    ),
+  });
+
+  assert.equal(check.ok, false);
+
+  const problem = check.problems.find((candidate) => candidate.endsWith(line));
+  assert.ok(problem !== undefined, "誰を指すか分からない主語の理由が返っていない");
+
+  assert.ok(
+    problem.includes("騎手、調教師、この馬のように対象を書く"),
+    "対象を明記させる案内が無い",
+  );
+  assert.ok(
+    problem.includes(`人間から渡された観察なら「${HUMAN_OBSERVATION_WORDING}」と書く`),
+    "統一した書き方を、人間の観察の場合として案内していない",
+  );
+  assert.ok(
+    !/「レースを見た人間の観察では」に統一/.test(problem),
+    "直し方を人間の観察へ決め打ちしている",
+  );
+});
+
+test("誰を指すか分からない主語の検査は、保存部分だけに当てる", () => {
+  const inNote = entryResponse(formatExecutionConfirmation("entry")).replace(
+    "- 映像の観察は渡されていない",
+    "- 本人から渡された観察は、この出走の分だけだった",
+  );
+
+  assert.deepEqual(checkExecutionConfirmations({ kinds: ["entry"], response: inNote }), {
+    ok: true,
+    problems: [],
+  });
 });
 
 test("実行確認が無ければ保存しない", () => {
@@ -350,6 +565,21 @@ test("検証する役の指示に、実行確認を弾く条件が書いてあ�
     "実行確認が保存する本文に混ざっている",
   ]) {
     assert.ok(instructions.includes(condition), `verifier の指示に「${condition}」が無い`);
+  }
+});
+
+test("人間の観察の出所を統一する規則が、分析する役と検証する役の指示に載っている", () => {
+  for (const role of ["entry-analyst", "race-analyst", "horse-analyst", "verifier"]) {
+    const instructions = readInstructions(role);
+
+    assert.ok(
+      instructions.includes(HUMAN_OBSERVATION_WORDING),
+      `${role} の指示に「${HUMAN_OBSERVATION_WORDING}」が無い`,
+    );
+    assert.ok(
+      instructions.includes("個人名、「本人」、「ユーザー」"),
+      `${role} の指示に、個人名・「本人」・「ユーザー」を書かない規則が無い`,
+    );
   }
 });
 

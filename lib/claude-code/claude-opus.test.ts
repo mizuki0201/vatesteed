@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AGENT_MODE_ENV } from "../agent-mode/index.ts";
-import { buildClaudeOpusArgs, claudeChildEnv, parseClaudeCommand } from "./claude-opus.ts";
+import {
+  buildClaudeOpusArgs,
+  claudeChildEnv,
+  parseClaudeCommand,
+  shouldVerifyAuth,
+} from "./claude-opus.ts";
 
 test("Claude Code を Opus 指定で非対話実行する", () => {
   assert.deepEqual(buildClaudeOpusArgs({ prompt: "AUTH_OK だけを返す" }), [
@@ -60,8 +65,21 @@ test("依頼文の直接指定を受け取らない", () => {
   assert.throws(() => parseClaudeCommand(["--", "直接の依頼文"]), /使い方/);
 });
 
-test("接続確認を専用の引数で受け取る", () => {
-  assert.deepEqual(parseClaudeCommand(["--", "--check-auth"]), { kind: "check-auth" });
+test("接続確認だけの単独起動を受け取らない", () => {
+  assert.throws(() => parseClaudeCommand(["--", "--check-auth"]), /使い方/);
+});
+
+test("接続確認は最初の新規実行にだけ含める", () => {
+  assert.equal(shouldVerifyAuth({ kind: "new", taskPath: "docs/tasks/example.md" }), true);
+  assert.equal(shouldVerifyAuth({ kind: "restart", taskPath: "docs/tasks/example.md" }), false);
+  assert.equal(
+    shouldVerifyAuth({
+      kind: "resume",
+      runId: "20260828-093012-a1b2c3d4",
+      taskPath: "docs/tasks/example.md",
+    }),
+    false,
+  );
 });
 
 test("明示的に最初からやり直す操作を受け取る", () => {

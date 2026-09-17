@@ -10,6 +10,7 @@ import type { ClaudeCommand } from "./claude-opus.ts";
 import type { ClaudeProgress } from "./activity.ts";
 import type { ClaudeSignalSource } from "./signals.ts";
 import {
+  AUTH_CHECK_PROMPT,
   type ClaudeProcessInput,
   type ClaudeProcessOutcome,
   type ClaudeProcessRunner,
@@ -667,23 +668,207 @@ test("異常終了で残ったロックを回収し、実行中のままの記�
   assert.ok(calls[0].args.includes("aaaa-bbbb"));
 });
 
-test("接続確認はタスクのロックを取らない", async () => {
+test("新規実行は接続確認と本実行をこの順に1回ずつ起動する", async () => {
   const runsDir = await makeDir();
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
   const output = await runClaudeOpus({
-    command: {
-      kind: "check-auth",
-      prompt: "Return exactly: AUTH_OK",
-      taskPath: null,
-      mode: null,
-      executorRole: null,
-    },
+    command: newCommand("タスクをやる"),
     runsDir,
-    runProcess: stubRunner({ stdout: successStdout() }).run,
+    runProcess: run,
     env: {},
+    verifyAuth: true,
   });
 
   assert.equal(output.ok, true);
-  await assert.rejects(() => readdir(taskLocksDir(runsDir)));
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].args.at(-1), AUTH_CHECK_PROMPT);
+  assert.equal(calls[1].args.at(-1), "タスクをやる");
+  // 接続確認は実行記録を作らない。
+  assert.deepEqual(await readdir(runsDir), [`${output.run.runId}.json`]);
+});
+
+test("接続確認が失敗したら本実行を起動しない", async () => {
+  const runsDir = await makeDir();
+  const { run, calls } = stubRunner({
+    stdout: successStdout({ is_error: true, subtype: "error_during_execution" }),
+  });
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("タスクをやる"),
+        runsDir,
+        runProcess: run,
+        env: {},
+        verifyAuth: true,
+      }),
+    /接続確認に失敗した/,
+  );
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(await readdir(runsDir), []);
+});
+
+test("接続確認は結果が AUTH_OK と完全に一致しなければ本実行を起動しない", async () => {
+  // 余分な文章が付いた結果も、別の本文も通さない。前後の空白だけは除いて比べる。
+  for (const result of ["こんにちは", "AUTH_OK です", "承知しました。AUTH_OK", "AUTH_OKAY"]) {
+    const runsDir = await makeDir();
+    const { run, calls } = stubRunner({ stdout: successStdout({ result }) });
+
+    await assert.rejects(
+      () =>
+        runClaudeOpus({
+          command: newCommand("タスクをやる"),
+          runsDir,
+          runProcess: run,
+          env: {},
+          verifyAuth: true,
+        }),
+      /AUTH_OK と一致しなかった/,
+    );
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(await readdir(runsDir), []);
+  }
+});
+
+test("前後に空白が付いた AUTH_OK は接続確認を通す", async () => {
+  const runsDir = await makeDir();
+  const { run, calls } = stubRunner({ stdout: successStdout({ result: "  AUTH_OK\n" }) });
+
+  const output = await runClaudeOpus({
+    command: newCommand("タスクをやる"),
+    runsDir,
+    runProcess: run,
+    env: {},
+    verifyAuth: true,
+  });
+
+  assert.equal(output.ok, true);
+  assert.equal(calls.length, 2);
+});
+
+test("接続確認の途中で中断されたら、子プロセスを終わらせて本実行を起動しない", async () => {
+  const runsDir = await makeDir();
+  const signals = manualSignals();
+  const calls: ClaudeProcessInput[] = [];
+  const abortedDuringCall: boolean[] = [];
+
+  const runProcess: ClaudeProcessRunner = async (input) => {
+    calls.push(input);
+    signals.send("SIGINT");
+    abortedDuringCall.push(input.abort?.aborted === true);
+
+    // 中断で子プロセスを終わらせたときと同じ返り方をする。
+    return { exitCode: null, stdout: "", stderr: "" };
+  };
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("タスクをやる"),
+        runsDir,
+        runProcess,
+        env: {},
+        verifyAuth: true,
+        signals: signals.source,
+      }),
+    /SIGINT で中断された/,
+  );
+
+  // 接続確認の1回だけで、本実行は起動していない。
+  assert.equal(calls.length, 1);
+  assert.deepEqual(abortedDuringCall, [true]);
+  assert.deepEqual(await readdir(runsDir), []);
+  // 中断の受け取りもタスクのロックも残さない。
+  assert.equal(signals.listening(), false);
+  assert.deepEqual(await readdir(taskLocksDir(runsDir)), []);
+});
+
+test("接続確認は実行モードを子プロセスへ渡さない", async () => {
+  const runsDir = await makeDir();
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await runClaudeOpus({
+    command: { ...newCommand("タスクをやる"), mode: "racing" },
+    runsDir,
+    runProcess: run,
+    env: {},
+    verifyAuth: true,
+  });
+
+  assert.equal(calls[0].env[AGENT_MODE_ENV], undefined);
+  assert.equal(calls[1].env[AGENT_MODE_ENV], "racing");
+});
+
+test("接続確認を行わない実行は本実行だけを起動する", async () => {
+  for (const kind of ["resume", "restart"] as const) {
+    const runsDir = await makeDir();
+    await saveRunRecord(runsDir, storedRecord());
+    const { run, calls } = stubRunner({ stdout: successStdout() });
+
+    const output = await runClaudeOpus({
+      command:
+        kind === "resume"
+          ? resumeCommand("20260828-093012-a1b2c3d4", "続きをやる")
+          : newCommand("最初からやる"),
+      runsDir,
+      runProcess: run,
+      env: {},
+      allowExistingTaskRun: kind === "restart",
+    });
+
+    assert.equal(output.ok, true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args.at(-1), kind === "resume" ? "続きをやる" : "最初からやる");
+  }
+});
+
+test("接続確認はタスクのロックを取ってから行う", async () => {
+  const runsDir = await makeDir();
+  await acquireTaskLock({
+    dir: taskLocksDir(runsDir),
+    taskPath: "docs/tasks/example.md",
+    pid: 4321,
+    isProcessAlive: () => true,
+  });
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("タスクをやる"),
+        runsDir,
+        runProcess: run,
+        env: {},
+        verifyAuth: true,
+        isProcessAlive: () => true,
+      }),
+    /実行中/,
+  );
+
+  assert.equal(calls.length, 0);
+});
+
+test("同じタスクに実行記録があれば接続確認もしない", async () => {
+  const runsDir = await makeDir();
+  await saveRunRecord(runsDir, storedRecord());
+  const { run, calls } = stubRunner({ stdout: successStdout() });
+
+  await assert.rejects(
+    () =>
+      runClaudeOpus({
+        command: newCommand("タスクをやる"),
+        runsDir,
+        runProcess: run,
+        env: {},
+        verifyAuth: true,
+      }),
+    /再開してください/,
+  );
+
+  assert.equal(calls.length, 0);
 });
 
 /** 中断の書き込みが終わるまで実行記録を読み直す。 */
@@ -1024,29 +1209,25 @@ test("未完了からの再開は差し戻しに数えない", async () => {
   assert.deepEqual(sendBacks, []);
 });
 
-test("接続確認は差し戻しにも完了の記録にも数えない", async () => {
+test("接続確認は差し戻しにもレビューの記録にも数えない", async () => {
   const runsDir = await makeDir();
   const notified: string[] = [];
 
   const output = await runClaudeOpus({
-    command: {
-      kind: "check-auth",
-      prompt: "Return exactly: AUTH_OK",
-      taskPath: null,
-      mode: null,
-      executorRole: null,
-    },
+    command: newCommand("タスクをやる"),
     runsDir,
-    runProcess: stubRunner({ stdout: successStdout() }).run,
+    runProcess: stubRunner({ stdout: successStdout({ result: "AUTH_OK" }) }).run,
     env: {},
+    verifyAuth: true,
     onSendBack: async () => {
       notified.push("send-back");
     },
-    onCompleted: async () => {
-      notified.push("completed");
+    onCompleted: async (record) => {
+      notified.push(`completed:${record.runId}`);
     },
   });
 
   assert.equal(output.ok, true);
-  assert.deepEqual(notified, []);
+  // 本実行の完了だけを記録し、接続確認は数えない。
+  assert.deepEqual(notified, [`completed:${output.run.runId}`]);
 });

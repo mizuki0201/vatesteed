@@ -71,6 +71,13 @@ export type RunClaudeOpusOptions = {
   reopenCompleted?: boolean;
   /** 本人が最初からやり直すよう明示したときだけ、同じタスクの新規実行を許す。 */
   allowExistingTaskRun?: boolean;
+  /**
+   * 本実行を起動する直前に接続確認を行うか。**最初の新規実行だけ true にする。**
+   *
+   * 再開と、明示的に最初からやり直す新規実行では繰り返さない（docs/claude-code-bridge.md の
+   * 「Claude Codeを起動する直前の接続確認」）。
+   */
+  verifyAuth?: boolean;
   /** ロックの持ち主がまだ動いているかの確認。テストで差し込む */
   isProcessAlive?: (pid: number) => boolean;
   /** 中断シグナルの受け取り方。既定は実行中のプロセス */
@@ -85,16 +92,104 @@ export type RunClaudeOpusOptions = {
    * 入口が決める。ここでは呼ぶ時点だけを持つ。
    */
   onSendBack?: (record: ClaudeRunRecord) => Promise<void>;
-  /**
-   * 検証を通り、完了として実行記録を保存した直後に呼ぶ。
-   *
-   * **接続確認では呼ばない。** タスクMarkdownを持たない実行は、記録する依頼が無い。
-   */
+  /** 検証を通り、完了として実行記録を保存した直後に呼ぶ。 */
   onCompleted?: (record: ClaudeRunRecord) => Promise<void>;
 };
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** 接続確認で渡す依頼文。ファイル操作をしない最小の呼び出しにする。 */
+export const AUTH_CHECK_PROMPT = "Return exactly: AUTH_OK";
+
+/** 接続確認が返すべき本文。前後の空白を除いてこれと完全に一致しなければ通さない。 */
+const AUTH_CHECK_EXPECTED = "AUTH_OK";
+
+export type ClaudeAuthCheck = { ok: true } | { ok: false; error: string };
+
+/**
+ * Claude Code へ接続できるかを、最小の呼び出しで1回だけ確かめる。
+ *
+ * **接続確認のための実行記録も、接続確認だけのロックも作らない。** 呼び出し元がタスクの
+ * ロックを取った状態で動き、そのタスクの本実行へそのまま続く（docs/claude-code-bridge.md の
+ * 「Claude Codeを起動する直前の接続確認」）。返す失敗理由には Claude の応答本文を入れない。
+ */
+export async function checkClaudeAuth({
+  runProcess,
+  env = process.env,
+  abort,
+}: {
+  runProcess: ClaudeProcessRunner;
+  env?: Record<string, string | undefined>;
+  /** 入口が中断されたときに立つ。接続確認の子プロセスを終わらせるために渡す */
+  abort?: AbortSignal;
+}): Promise<ClaudeAuthCheck> {
+  let outcome: ClaudeProcessOutcome;
+  try {
+    outcome = await runProcess({
+      args: buildClaudeOpusArgs({ prompt: AUTH_CHECK_PROMPT }),
+      // 接続確認はタスクを持たないので、実行モードは渡さない。
+      env: { ...env, ...claudeChildEnv(null) },
+      abort,
+    });
+  } catch (error) {
+    return { ok: false, error: `接続確認で Claude を起動できなかった。${messageOf(error)}` };
+  }
+
+  const check = checkClaudeResult(outcome.stdout);
+  if (!check.ok) return { ok: false, error: `接続確認に失敗した。${check.reason}` };
+  if (outcome.exitCode !== 0) {
+    return {
+      ok: false,
+      error: `接続確認の終了コードが 0 ではなかった（${outcome.exitCode ?? "シグナルで終了"}）。`,
+    };
+  }
+  // `Return exactly: AUTH_OK` と頼んでいるので、余分な文章が付いた結果は通さない。
+  if (check.result.trim() !== AUTH_CHECK_EXPECTED) {
+    return { ok: false, error: `接続確認の結果が ${AUTH_CHECK_EXPECTED} と一致しなかった。` };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * 本実行の前に接続確認を行い、通らなければ例外にする。
+ *
+ * **接続確認の間も中断を受け取る。** 中断されたら子プロセスを終わらせ、実行記録を作らずに
+ * 終わる。この時点では実行記録がまだ無いので、未完了として残すものも無い。
+ */
+async function verifyAuthBeforeRun({
+  runProcess,
+  env,
+  signals,
+}: {
+  runProcess: ClaudeProcessRunner;
+  env: Record<string, string | undefined>;
+  signals: ClaudeSignalSource;
+}): Promise<void> {
+  const controller = new AbortController();
+  let interruptedBy: string | null = null;
+  const stopListening = signals.listen((signal) => {
+    if (interruptedBy !== null) return;
+    interruptedBy = signal;
+    controller.abort();
+  });
+
+  let auth: ClaudeAuthCheck;
+  try {
+    auth = await checkClaudeAuth({ runProcess, env, abort: controller.signal });
+  } finally {
+    stopListening();
+  }
+
+  // 中断は接続確認の結果より優先する。子プロセスを終わらせたことで失敗が返っていても同じ。
+  if (interruptedBy !== null) {
+    throw new Error(
+      `入口が ${interruptedBy} で中断された。接続確認で止まり、本実行は起動していません。`,
+    );
+  }
+  if (!auth.ok) throw new Error(`${auth.error}本実行は起動していません。`);
 }
 
 /**
@@ -141,9 +236,6 @@ function assertSameTask(previous: ClaudeRunRecord, command: ClaudeCommand): void
 export async function runClaudeOpus(options: RunClaudeOpusOptions): Promise<ClaudeRunOutput> {
   const { command, runsDir, locksDir = taskLocksDir(runsDir), now, isProcessAlive } = options;
 
-  // 接続確認にはタスクMarkdownが無いので、ロックを取る対象も無い。
-  if (command.taskPath === null) return runLocked(options, null);
-
   const lock = await acquireTaskLock({
     dir: locksDir,
     taskPath: command.taskPath,
@@ -173,6 +265,7 @@ async function runLocked(
     now = () => new Date(),
     reopenCompleted = false,
     allowExistingTaskRun = false,
+    verifyAuth = false,
     signals = processSignalSource(),
     onProgress,
     onSendBack,
@@ -182,31 +275,32 @@ async function runLocked(
 ): Promise<ClaudeRunOutput> {
   const startedAt = now().toISOString();
 
-  if (command.taskPath !== null) {
-    const records = await findRunRecordsForTask(runsDir, command.taskPath);
-    const running = records.filter((record) => record.state === "running");
+  const records = await findRunRecordsForTask(runsDir, command.taskPath);
+  const running = records.filter((record) => record.state === "running");
 
-    if (reclaimedFrom !== null) {
-      for (const record of running) {
-        await markRunIncomplete(
-          runsDir,
-          record.runId,
-          `前回の実行（プロセス ${reclaimedFrom}）が実行記録を running のまま終了した。`,
-          now,
-        );
-      }
-    } else if (running[0] !== undefined) {
-      throw new Error(
-        `タスク ${command.taskPath} は実行記録 ${running[0].runId} が実行中です。終わるまで新規実行も再開もできません。`,
+  if (reclaimedFrom !== null) {
+    for (const record of running) {
+      await markRunIncomplete(
+        runsDir,
+        record.runId,
+        `前回の実行（プロセス ${reclaimedFrom}）が実行記録を running のまま終了した。`,
+        now,
       );
     }
-
-    if (command.kind === "new" && !allowExistingTaskRun && records[0] !== undefined) {
-      throw new Error(
-        `タスク ${command.taskPath} には実行記録 ${records[0].runId} があります。新規実行せず、同じ実行記録を再開してください。`,
-      );
-    }
+  } else if (running[0] !== undefined) {
+    throw new Error(
+      `タスク ${command.taskPath} は実行記録 ${running[0].runId} が実行中です。終わるまで新規実行も再開もできません。`,
+    );
   }
+
+  if (command.kind === "new" && !allowExistingTaskRun && records[0] !== undefined) {
+    throw new Error(
+      `タスク ${command.taskPath} には実行記録 ${records[0].runId} があります。新規実行せず、同じ実行記録を再開してください。`,
+    );
+  }
+
+  // タスクの検証と排他確認を済ませてから接続確認へ進む。失敗したら本実行を起動しない。
+  if (verifyAuth) await verifyAuthBeforeRun({ runProcess, env, signals });
 
   let previous =
     command.kind === "resume" ? await loadRunRecord(runsDir, command.runId) : null;
@@ -339,7 +433,7 @@ async function runLocked(
   }
 
   await saveRunRecord(runsDir, record);
-  if (record.state === "completed" && command.taskPath !== null) await onCompleted?.(record);
+  if (record.state === "completed") await onCompleted?.(record);
 
   // 中断されたときは、検証の理由ではなく実行記録に残した中断理由をそのまま返す。
   return {

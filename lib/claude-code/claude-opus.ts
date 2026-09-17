@@ -76,20 +76,12 @@ export function buildClaudeOpusArgs({
 
 /** コマンドラインから受け取る操作。依頼本文は受け取らず、タスクMarkdownだけを受け取る。 */
 export type ClaudeCliCommand =
-  | { kind: "check-auth" }
   | { kind: "new"; taskPath: string }
   | { kind: "restart"; taskPath: string }
   | { kind: "resume"; runId: string; taskPath: string };
 
 /** 検証済みのタスクから組み立てた、実行処理へ渡す値。 */
 export type ClaudeCommand =
-  | {
-      kind: "check-auth";
-      prompt: string;
-      taskPath: null;
-      mode: null;
-      executorRole: null;
-    }
   | {
       kind: "new";
       prompt: string;
@@ -106,9 +98,18 @@ export type ClaudeCommand =
       executorRole: string;
     };
 
+/**
+ * 接続確認を行うかを操作から決める。
+ *
+ * **最初の新規実行だけ。** 再開と、本人が明示して最初からやり直す新規実行では繰り返さない
+ * （docs/claude-code-bridge.md の「Claude Codeを起動する直前の接続確認」）。
+ */
+export function shouldVerifyAuth(command: ClaudeCliCommand): boolean {
+  return command.kind === "new";
+}
+
 const USAGE = [
   "使い方:",
-  "  pnpm claude:opus -- --check-auth",
   "  pnpm claude:opus -- --task docs/tasks/<タスク名>.md",
   "  pnpm claude:opus -- --resume <実行記録のID> --task docs/tasks/<タスク名>.md",
   "  pnpm claude:opus -- --restart --task docs/tasks/<タスク名>.md",
@@ -118,13 +119,13 @@ const USAGE = [
  * `pnpm run` が残す区切りを除き、新規実行か再開かを見分ける。
  *
  * **再開できないときに新規実行へ切り替えない。** 形式が合わなければ例外にする。
+ *
+ * **タスクMarkdownを伴わない操作は受け取らない。** 接続確認だけを単独で起動できると、
+ * 準備が終わる前に利用枠を使って本実行へ続かない状態を作れてしまうため
+ * （docs/claude-code-bridge.md の「Claude Codeを起動する直前の接続確認」）。
  */
 export function parseClaudeCommand(argv: readonly string[]): ClaudeCliCommand {
   const args = argv[0] === "--" ? argv.slice(1) : argv;
-
-  if (args.length === 1 && args[0] === "--check-auth") {
-    return { kind: "check-auth" };
-  }
 
   if (args[0] === "--resume" || args[0] === "-r") {
     const runId = args[1] ?? "";

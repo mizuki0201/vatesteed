@@ -5,9 +5,10 @@
  * そこで、担当する種類の一般ルールと参考例を読んだことを、返答の保存しない側へ決まった形で
  * 残す（`docs/analysis-quality.md` の「実行時の確認」）。
  *
- * 実行確認の形と対応に加え、血統分析の保存部分に分析結果ではない材料不足の報告や一般的な注意が
- * 混ざっていないかを機械的に見る。事実から読みが出ているかなど、機械で決められない中身は
- * `verifier` が見る。
+ * 実行確認の形と対応に加え、保存部分に誰を指すか分からない主語が無いか、血統分析の保存部分に
+ * 分析結果ではない材料不足の報告や一般的な注意が混ざっていないか、馬の総合分析の保存部分に
+ * 経験していない条件の記述が入っていないかを機械的に見る。事実から読みが出ているかなど、
+ * 機械で決められない中身は `verifier` が見る。
  */
 
 import {
@@ -50,6 +51,91 @@ export const PEDIGREE_EMPTY_CONCLUSION_PATTERNS: readonly RegExp[] = [
   /(?:可能性|余地)(?:は|を)(?:否定しない|消えない)/,
   /(?:とは|とまでは)(?:言えない|断定できない)/,
 ];
+
+/**
+ * 馬の総合分析の保存部分へ出してはいけない書き方。
+ *
+ * 距離、馬場、競馬場、頭数、位置取り、脚質、展開、負担重量などについて、まだ経験していない
+ * ことや選ばれていない戦法を書くのは、本文の長さや置く場所に関係なく禁止されている
+ * （`docs/analysis-quality.md` の「馬の総合分析」）。
+ *
+ * **ここで見るのは、実際に保存されてしまった書き方だけ。** 言い換えは限りが無いので、
+ * 語句をそろえて網羅しようとしない。意味を見る判定は `verifier` が行う。「重賞初挑戦で
+ * 勝った」のように今回終えた条件とそこで示した内容は、この検出に当たらない。
+ */
+export const HORSE_UNTRIED_CONDITION_PATTERNS: readonly RegExp[] = [
+  /未経験/,
+  /経験(?:は|が|も)?(?:まだ)?(?:無|な)(?:い|く|かった|し)/,
+  /経験(?:を)?(?:まだ)?し(?:て(?:い)?)?(?:無|な)(?:い|く|かった)/,
+  /材料(?:は|が|も)?(?:まだ)?(?:無|な)(?:い|く|かった|し)/,
+];
+
+/**
+ * 人間から渡された観察の出所を示す、保存部分で統一した書き方。
+ *
+ * 保存した分析は画面表示や販売する記事へそのまま使うので、観察を渡した人を個人として
+ * 書かない（`docs/analysis-quality.md` の「人間の観察を本文へ書く表現」）。
+ */
+export const HUMAN_OBSERVATION_WORDING = "レースを見た人間の観察では";
+
+/**
+ * 保存部分で、誰を指すか分からない主語。
+ *
+ * **止めるのは主語が曖昧なことであって、人間の観察の書き方だけではない。** 「本人」は騎手、
+ * 調教師、その馬、観察を渡した人のどれにも読めてしまい、本文だけでは決められない。
+ * 「ユーザー」はどれを指していても外向きの本文に置かない。
+ *
+ * **個人名は機械で見分けられないので、ここでは見ない。** 意味を見る判定は `verifier` が行う。
+ */
+export const AMBIGUOUS_SUBJECT_PATTERNS: readonly RegExp[] = [/本人/, /ユーザー/];
+
+/**
+ * 上の語と文字が重なるだけで、分析本文では普通に使う語。見る前に外す。
+ *
+ * 「日本人」は「本人」を文字として含むが、誰を指すかが曖昧なわけではない。外さないと
+ * 「日本人騎手」まで止めてしまう。外したあとに残る「騎手本人」「父本人」は止める。
+ */
+export const AMBIGUOUS_SUBJECT_EXCEPTIONS: readonly RegExp[] = [/日本人/g];
+
+/** 文字が重なるだけの語を外した行を返す。 */
+function withoutAmbiguousSubjectExceptions(line: string): string {
+  return AMBIGUOUS_SUBJECT_EXCEPTIONS.reduce((rest, word) => rest.replace(word, ""), line);
+}
+
+/** 保存部分から、誰を指すか分からない主語が入った行を返す。 */
+export function findAmbiguousSubjects(text: string): readonly string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => {
+      const rest = withoutAmbiguousSubjectExceptions(line);
+      return AMBIGUOUS_SUBJECT_PATTERNS.some((pattern) => pattern.test(rest));
+    });
+}
+
+/**
+ * 誰を指すか分からない主語を止めたときの理由。
+ *
+ * **直し方を人間の観察へ決め打ちしない。** 「本人」が騎手、調教師、その馬を指している文を
+ * 「レースを見た人間の観察では」へ直すと、別の人の話にすり替わる。まず対象を書かせ、
+ * 人間から渡された観察だったときだけ統一した書き方へ寄せる。
+ */
+export function formatAmbiguousSubjectProblem(line: string): string {
+  return (
+    "保存部分に、誰を指すか分からない主語がある。騎手、調教師、この馬のように対象を書く。" +
+    `人間から渡された観察なら「${HUMAN_OBSERVATION_WORDING}」と書く: ${line}`
+  );
+}
+
+/** 馬の総合分析の保存部分から、経験していない条件を書いた行を返す。 */
+export function findHorseUntriedConditions(text: string): readonly string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => HORSE_UNTRIED_CONDITION_PATTERNS.some((pattern) => pattern.test(line)));
+}
 
 /** 血統分析の保存部分から、分析結果ではない留保が入った行を返す。 */
 export function findPedigreeEmptyConclusions(text: string): readonly string[] {
@@ -197,6 +283,10 @@ export type ExecutionConfirmationCheck = {
  * - 分析の種類と参考例が対応していない
  * - 担当しない種類の実行確認が混ざっている
  * - 実行確認が保存する本文に混ざっている
+ *
+ * 加えて、保存部分だけを対象に、誰を指すか分からない主語を分析の種類によらず弾き、血統分析では
+ * 材料不足の報告を、馬の総合分析ではまだ経験していない条件の記述を弾く。`保存しないメモ` は
+ * 対象にしない。
  */
 export function checkExecutionConfirmations(input: {
   readonly kinds: readonly ReferenceExampleKind[];
@@ -206,9 +296,21 @@ export function checkExecutionConfirmations(input: {
   const parts = splitAnalysisResponse(input.response);
   const { confirmations, malformedLines } = parseExecutionConfirmations(input.response);
 
+  if (parts.hasSaved) {
+    for (const line of findAmbiguousSubjects(parts.saved)) {
+      problems.push(formatAmbiguousSubjectProblem(line));
+    }
+  }
+
   if (parts.hasSaved && input.kinds.includes("pedigree")) {
     for (const line of findPedigreeEmptyConclusions(parts.saved)) {
       problems.push(`血統分析の保存部分に、分析結果ではない留保がある: ${line}`);
+    }
+  }
+
+  if (parts.hasSaved && input.kinds.includes("horse")) {
+    for (const line of findHorseUntriedConditions(parts.saved)) {
+      problems.push(`馬の総合分析の保存部分に、まだ経験していない条件の記述がある: ${line}`);
     }
   }
 

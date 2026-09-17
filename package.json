@@ -59,6 +59,7 @@
     "@types/pg": "8.21.0",
     "@types/react": "19.2.15",
     "@types/react-dom": "19.2.3",
+    "microsandbox": "^0.6.9",
     "pg": "8.22.0",
     "typescript": "6.0.3",
     "vercel": "^58.7.1"

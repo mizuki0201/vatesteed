@@ -43,7 +43,7 @@ importers:
         version: 4.3.0
       '@vercel/connect':
         specifier: 0.4.3
-        version: 0.4.3(ai@7.0.56(zod@4.4.3))(eve@0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2))
+        version: 0.4.3(ai@7.0.56(zod@4.4.3))(eve@0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.9))
       ai:
         specifier: ^7.0.38
         version: 7.0.56(zod@4.4.3)
@@ -58,7 +58,7 @@ importers:
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       eve:
         specifier: 0.31.3
-        version: 0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)
+        version: 0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.9)
       lucide-react:
         specifier: 1.16.0
         version: 1.16.0(react@19.2.6)
@@ -111,6 +111,9 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.15)
+      microsandbox:
+        specifier: ^0.6.9
+        version: 0.6.9
       pg:
         specifier: 8.22.0
         version: 8.22.0
@@ -1963,6 +1966,38 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
+  '@superradcompany/microsandbox-darwin-arm64@0.6.9':
+    resolution: {integrity: sha512-0b7XqqmAr+MPpz2kd8Bau5tEDSHjcQFVyZd9T2kPLM+KAFOlRKUVotQuGHMPr4B+X64Q6eRXYsIwBZ4f5g95Cw==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.9':
+    resolution: {integrity: sha512-D2xvbNsQG5P9y9JuaJwNfVkjYxOa10uoim8ZNSCkMZbcmzu+OxVqZVGOLyDYcA7CnYepninKqtst8CyXn2CACQ==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@superradcompany/microsandbox-linux-x64-gnu@0.6.9':
+    resolution: {integrity: sha512-nfL/CZbHqKDASH9V4OjevkMvw6PNPz6pFqdzrApzel3xcVCZMpdP34fhxV4hDhdHgghniSW6EQvTl0Zxj+cmzw==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.9':
+    resolution: {integrity: sha512-SYsZckrCo27yl+Rkp6H9Fe6AkeMZ0uN/psPfvbyK6PYvOiWInZoxKnllhUvFLi+LgFin/RhPQUBpNTGAuccCmw==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@superradcompany/microsandbox-win32-x64-msvc@0.6.9':
+    resolution: {integrity: sha512-VnrXTRPDSfAexe40rUyvvSX4zzQ3g9ws3o1bQjX5sjPqffcINve6hMOuTQgxIAzlp+UoIauMFq4cAlWuwxgqFQ==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [win32]
+
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
 
@@ -3543,6 +3578,11 @@ packages:
   micromatch@4.0.8:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
+
+  microsandbox@0.6.9:
+    resolution: {integrity: sha512-la9REVB0OAoSqBkmivTDAtPR/Bje5kxRJZIStK1dhwq84Y6+XOo+tGwQU8U5LgzB+8MMW+55SFLmafFmBws4FA==}
+    engines: {node: '>= 22'}
+    hasBin: true
 
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
@@ -6128,6 +6168,21 @@ snapshots:
       mermaid: 11.16.1
       react: 19.2.6
 
+  '@superradcompany/microsandbox-darwin-arm64@0.6.9':
+    optional: true
+
+  '@superradcompany/microsandbox-linux-arm64-gnu@0.6.9':
+    optional: true
+
+  '@superradcompany/microsandbox-linux-x64-gnu@0.6.9':
+    optional: true
+
+  '@superradcompany/microsandbox-win32-arm64-msvc@0.6.9':
+    optional: true
+
+  '@superradcompany/microsandbox-win32-x64-msvc@0.6.9':
+    optional: true
+
   '@swc/helpers@0.5.15':
     dependencies:
       tslib: 2.8.1
@@ -6463,12 +6518,12 @@ snapshots:
     dependencies:
       execa: 5.1.1
 
-  '@vercel/connect@0.4.3(ai@7.0.56(zod@4.4.3))(eve@0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2))':
+  '@vercel/connect@0.4.3(ai@7.0.56(zod@4.4.3))(eve@0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.9))':
     dependencies:
       '@vercel/oidc': 3.8.1
     optionalDependencies:
       ai: 7.0.56(zod@4.4.3)
-      eve: 0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)
+      eve: 0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.9)
 
   '@vercel/container@0.1.1': {}
 
@@ -7207,11 +7262,13 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2):
+  eve@0.31.3(@vercel/blob@2.4.0)(ai@7.0.56(zod@4.4.3))(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)(microsandbox@0.6.9):
     dependencies:
       ai: 7.0.56(zod@4.4.3)
       nitro: 3.0.260610-beta(@vercel/blob@2.4.0)(chokidar@4.0.0)(jiti@2.7.0)(lru-cache@11.5.2)
       undici: 8.9.0
+    optionalDependencies:
+      microsandbox: 0.6.9
     transitivePeerDependencies:
       - '@azure/app-configuration'
       - '@azure/cosmos'
@@ -8160,6 +8217,14 @@ snapshots:
     dependencies:
       braces: 3.0.3
       picomatch: 2.3.2
+
+  microsandbox@0.6.9:
+    optionalDependencies:
+      '@superradcompany/microsandbox-darwin-arm64': 0.6.9
+      '@superradcompany/microsandbox-linux-arm64-gnu': 0.6.9
+      '@superradcompany/microsandbox-linux-x64-gnu': 0.6.9
+      '@superradcompany/microsandbox-win32-arm64-msvc': 0.6.9
+      '@superradcompany/microsandbox-win32-x64-msvc': 0.6.9
 
   mime-db@1.52.0: {}
 

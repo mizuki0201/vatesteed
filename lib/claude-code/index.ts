@@ -18,6 +18,7 @@ export {
   type ClaudeCommand,
   type ClaudeOpusArgsInput,
   parseClaudeCommand,
+  shouldVerifyAuth,
 } from "./claude-opus.ts";
 export {
   checkClaudeResult,
@@ -57,6 +58,9 @@ export {
   taskLocksDir,
 } from "./task-lock.ts";
 export {
+  AUTH_CHECK_PROMPT,
+  checkClaudeAuth,
+  type ClaudeAuthCheck,
   type ClaudeProcessInput,
   type ClaudeProcessOutcome,
   type ClaudeProcessRunner,

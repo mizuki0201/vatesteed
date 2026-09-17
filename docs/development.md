@@ -160,17 +160,18 @@ Codex タスク経由で Claude Code を呼ぶ場合は、更新前の役定義�
 ### Codex から Claude Code を呼ぶ開発時の接続確認
 
 開発時も、[Codex から Claude Code を呼ぶ](claude-code-bridge.md) の手順を使う。新しい Codex タスクでは、
-docs やコードを変更する前にファイル操作をしない最小の接続確認を1回行う。認証はこのリポジトリの
+Codexが要件整理、正本となるdocsの更新、タスクMarkdownの準備を先に終える。認証はこのリポジトリの
 `.claude/settings.local.json` に閉じ、呼び出しは `pnpm claude:opus` で Opus に固定する。
 
-接続確認は `pnpm claude:opus -- --check-auth` を使う。Opusと認証が確認できなければ実装を始めない。
-失敗時にKeychain、APIキー、既定モデルへ切り替えることはしない。本人がCodex単体などを明示した
-依頼ではClaude Codeを使わないため、この接続確認も行わない。
+`preparation_status: ready` にしたあとの新規実行では、`pnpm claude:opus -- --task` の入口がタスクの
+検証と排他確認を済ませてから最小の接続確認を行い、成功直後に同じコマンド内で本実行を始める。
+単独の接続確認を準備前に実行しない。Opusと認証が確認できなければ実装を始めず、失敗時にKeychain、
+APIキー、既定モデルへ切り替えることもしない。本人がCodex単体などを明示した依頼ではClaude Codeを
+使わないため、この接続確認も行わない。
 
-**成功した接続確認は、そのCodexタスクが終わるまで使い回す。** 本来の依頼の前、再開の前、進捗を
-見るたびに繰り返さない。本実行がAPIエラーになっても認証確認をやり直さず、実行記録の状態と
-エラーを基準に扱う（正本は
-[claude-code-bridge.md](claude-code-bridge.md#新しい-codex-タスクでの接続確認)）。
+**接続確認は最初の新規実行にだけ含め、同じ実行記録の再開では繰り返さない。** 本実行がAPIエラーに
+なっても認証確認をやり直さず、実行記録の状態とエラーを基準に扱う（正本は
+[claude-code-bridge.md](claude-code-bridge.md#claude-codeを起動する直前の接続確認)）。
 
 **同じタスクの実行が動いている間は、新規実行も再開もできない。** 入口がタスク単位のロックを
 先に取るため、2つ目の呼び出しは拒否されて終わる。終わるのを待ってから次を出す。

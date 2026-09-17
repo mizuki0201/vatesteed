@@ -65,7 +65,8 @@ export type QueryResult = {
  * 残さないために、オプションを内側に閉じ込めたこの関数を通す。**
  *
  * 値は必ず `params` からプレースホルダ（`$1`, `$2`, ...）に入れること。SQL に文字列を直接
- * 埋め込まない。複数の文をまたぐトランザクションは張れないので、扱うのは1文だけ。
+ * 埋め込まない。扱うのは1文だけで、複数の文を1つのトランザクションで流すときは
+ * `transaction()` を使う。
  */
 export async function query(
   sqlText: string,
@@ -79,4 +80,30 @@ export async function query(
   });
 
   return { rowCount: result.rowCount, rows: result.rows };
+}
+
+/** `transaction()` に渡す1文。 */
+export type Statement = {
+  readonly text: string;
+  readonly params?: readonly unknown[];
+};
+
+/**
+ * 複数の文を、**1つのトランザクションで順に流す。** どれか1つが失敗したら全部取り消される。
+ *
+ * Neon の HTTP 経路は対話型のトランザクションを張れないので、途中の結果を見て次の文を
+ * 変えることはできない。**流す文と値は先に全部決めてから渡す。** 型パーサは `query()` と
+ * 同じものを内側で付ける。
+ */
+export async function transaction(
+  statements: readonly Statement[],
+): Promise<readonly QueryResult[]> {
+  const sql = getSql();
+
+  const results = await sql.transaction(
+    statements.map((statement) => sql.query(statement.text, [...(statement.params ?? [])])),
+    { fullResults: true, types: TYPE_PARSERS },
+  );
+
+  return results.map((result) => ({ rowCount: result.rowCount, rows: result.rows }));
 }

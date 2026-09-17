@@ -29,6 +29,12 @@ const SCREENS: readonly { readonly url: string; readonly what: string }[] = [
   { url: "/notes", what: "評価の横断一覧" },
   { url: "/dashboard", what: "ダッシュボード" },
   { url: "/dashboard/record-memo", what: "外で見かけた話の入稿と、取り込み待ちの一覧" },
+  { url: "/dashboard/register", what: "事実データの登録画面へのリンク" },
+  {
+    url: "/dashboard/register/course など",
+    what: "コース・騎手・厩舎・馬・レースを1つ作る",
+  },
+  { url: "/dashboard/register/entry", what: "レースを1つ選んで、出走を入れる・直す" },
   {
     url: "/dashboard/claude-reviews",
     what: "Claude Code への差し戻し回数と指摘件数を依頼ごとに見る",
@@ -56,6 +62,15 @@ export default async function Page() {
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               {pendingMemos === 0 ? "取り込み待ちは無い" : `取り込み待ち ${pendingMemos} 件`}
+            </p>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/register">
+          <Card className="mt-3 transition-colors hover:border-foreground/30">
+            <p className="font-semibold tracking-tight">データを登録する</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              馬・騎手・厩舎・コース・レース・出走を登録する
             </p>
           </Card>
         </Link>

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { editCourse } from "@/app/dashboard/register/actions";
+import { EditMenu, type EditAction } from "@/components/screens/edit-menu";
+import { CourseFields } from "@/components/screens/fact-fields";
+import { getCourseFacts, listTracks, type CourseFacts } from "@/lib/facts";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
 import { NoteBody } from "@/components/screens/note-body";
 import { getCourse, listCourseRaces } from "@/lib/courses";
@@ -13,10 +17,12 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 
   if (!course) notFound();
 
-  const races = await listCourseRaces(id);
+  const [races, facts] = await Promise.all([listCourseRaces(id), getCourseFacts(id)]);
+  const tracks = facts ? await listTracks() : [];
 
   return (
     <PageShell
+      actions={<EditMenu actions={editActions(facts, tracks)} />}
       back={{ href: "/courses", label: "コースの一覧" }}
       lead={`${course.turn}回り${course.layout ? `・${course.layout}` : ""} · 登録されているレース ${races.length} 件`}
       title={`${course.track} ${course.surface}${course.distanceM}m`}
@@ -72,4 +78,21 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
       </Section>
     </PageShell>
   );
+}
+
+/** owner にだけ出す、直す項目。 */
+function editActions(facts: CourseFacts | undefined, tracks: readonly string[]): EditAction[] {
+  if (!facts) return [];
+
+  return [
+    {
+      id: "facts",
+      label: "基本情報を直す",
+      title: "コースの基本情報を直す",
+      description: "同じ競馬場・馬場・距離・内外のコースが既にあるときは直せません。",
+      fields: <CourseFields defaults={facts} tracks={tracks} />,
+      hidden: { courseId: facts.id },
+      action: editCourse,
+    },
+  ];
 }

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { editTrainer } from "@/app/dashboard/register/actions";
+import { EditMenu, type EditAction } from "@/components/screens/edit-menu";
+import { TrainerFields } from "@/components/screens/fact-fields";
+import { getTrainerFacts, type TrainerFacts } from "@/lib/facts";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
 import { NoteBody } from "@/components/screens/note-body";
 import { getTrainer, listTrainerHorses } from "@/lib/trainers";
@@ -13,10 +17,11 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 
   if (!trainer) notFound();
 
-  const horses = await listTrainerHorses(id);
+  const [horses, facts] = await Promise.all([listTrainerHorses(id), getTrainerFacts(id)]);
 
   return (
     <PageShell
+      actions={<EditMenu actions={editActions(facts)} />}
       back={{ href: "/trainers", label: "厩舎の一覧" }}
       lead={trainer.affiliation ?? undefined}
       title={trainer.name}
@@ -59,4 +64,21 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
       </Section>
     </PageShell>
   );
+}
+
+/** owner にだけ出す、直す項目。 */
+function editActions(facts: TrainerFacts | undefined): EditAction[] {
+  if (!facts) return [];
+
+  return [
+    {
+      id: "facts",
+      label: "基本情報を直す",
+      title: `${facts.name}の基本情報を直す`,
+      description: "名前・開業日・所属を直します。",
+      fields: <TrainerFields defaults={facts} />,
+      hidden: { trainerId: facts.id },
+      action: editTrainer,
+    },
+  ];
 }

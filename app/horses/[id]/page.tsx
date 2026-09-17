@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
 import { NoteBody, PedigreeNoteBody } from "@/components/screens/note-body";
 import { EditMenu, type EditAction } from "@/components/screens/edit-menu";
+import { HorseFields } from "@/components/screens/fact-fields";
 import { Input } from "@/components/ui/input";
 import {
   getHorse,
@@ -13,6 +14,8 @@ import {
   retiredOnLabel,
   type HorseDetail,
 } from "@/lib/horses";
+import { getHorseFacts, type HorseFacts } from "@/lib/facts";
+import { editHorse } from "@/app/dashboard/register/actions";
 import { changeRetirement } from "./actions";
 
 export const metadata: Metadata = { title: "馬 — Vatesteed" };
@@ -23,11 +26,11 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 
   if (!horse) notFound();
 
-  const entries = await listHorseEntries(id);
+  const [entries, facts] = await Promise.all([listHorseEntries(id), getHorseFacts(id)]);
 
   return (
     <PageShell
-      actions={<EditMenu actions={editActions(horse)} />}
+      actions={<EditMenu actions={editActions(horse, facts)} />}
       back={{ href: "/horses", label: "馬の一覧" }}
       lead={
         <>
@@ -137,15 +140,30 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 }
 
 /** この画面で owner が書き換えられるもの。 */
-function editActions(horse: HorseDetail): EditAction[] {
+function editActions(horse: HorseDetail, facts: HorseFacts | undefined): EditAction[] {
+  const edit: EditAction[] = facts
+    ? [
+        {
+          id: "facts",
+          label: "基本情報を直す",
+          title: `${horse.name}の基本情報を直す`,
+          description: "父・母・所属厩舎は、登録済みのものから選びます。引退は「現役に変更」「引退に変更」で直します。",
+          fields: <HorseFields defaults={facts} />,
+          hidden: { horseId: horse.id },
+          action: editHorse,
+        },
+      ]
+    : [];
+
   // 海外の馬は現役と引退に分けていないので出さない（docs/data-model.md#horses）
-  if (horse.isOverseas) return [];
+  if (horse.isOverseas) return edit;
 
   const target = nextRetirementTarget(horse.retiredAt);
   const label = RETIREMENT_TARGET_LABELS[target];
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
 
   return [
+    ...edit,
     {
       id: "retirement",
       label,

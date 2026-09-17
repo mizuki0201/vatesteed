@@ -2,6 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { editRace } from "@/app/dashboard/register/actions";
+import { EditMenu, type EditAction } from "@/components/screens/edit-menu";
+import { RaceFields } from "@/components/screens/fact-fields";
+import type { PickerOption } from "@/components/screens/record-picker";
+import { getRaceFacts, listCourseOptions, type RaceFacts } from "@/lib/facts";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
 import { NoteBody, Prose } from "@/components/screens/note-body";
 import {
@@ -31,11 +36,13 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 
   if (!race) notFound();
 
-  const [entries, bets, payouts] = await Promise.all([
+  const [entries, bets, payouts, facts] = await Promise.all([
     listRaceEntries(id),
     listRaceBets(id),
     listRacePayouts(id),
+    getRaceFacts(id),
   ]);
+  const courses = facts ? await listCourseOptions() : [];
 
   const byNumber = [...entries].sort(
     (a, b) => (a.horseNumber ?? 99) - (b.horseNumber ?? 99) || a.horseName.localeCompare(b.horseName),
@@ -49,6 +56,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 
   return (
     <PageShell
+      actions={<EditMenu actions={editActions(facts, courses)} />}
       back={{ href: "/races", label: "レース一覧" }}
       lead={
         <>
@@ -462,4 +470,26 @@ function BetCard({ bet }: { readonly bet: RaceBet }) {
       )}
     </Card>
   );
+}
+
+/** owner にだけ出す、直す項目と、出走の登録画面へ移る項目。 */
+function editActions(facts: RaceFacts | undefined, courses: readonly PickerOption[]): EditAction[] {
+  if (!facts) return [];
+
+  return [
+    {
+      id: "facts",
+      label: "レース情報を直す",
+      title: "レース情報を直す",
+      description: "結果（馬場状態・天気・着順など）はここでは直せません。",
+      fields: <RaceFields courses={courses} defaults={facts} />,
+      hidden: { raceId: facts.id },
+      action: editRace,
+    },
+    {
+      id: "entries",
+      label: "出走を入れる",
+      href: `/dashboard/register/entry?race=${facts.id}`,
+    },
+  ];
 }

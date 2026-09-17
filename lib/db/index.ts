@@ -1,1 +1,1 @@
-export { getSql, query, type QueryResult } from "./db.ts";
+export { getSql, query, transaction, type QueryResult, type Statement } from "./db.ts";

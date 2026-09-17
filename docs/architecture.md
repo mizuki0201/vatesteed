@@ -247,7 +247,7 @@ Neon をプロジェクトに接続する際の Environments は **Development /
 
 **2つのうち、書き込み経路の側は 2026-08-22 に当たった。** `/dashboard/record-memo` から
 [`memos`](data-model.md#memos) に入る。2026-09-17 からは、owner が各画面のメニューから事実データも
-書き換える（どちらも [product.md の画面](product.md#画面)）。**まだ見直さないのは、
+書き換え、`/dashboard/register/` から事実データを登録する（どれも [product.md の画面](product.md#画面)）。**まだ見直さないのは、
 main へ直接コミットしていて Preview デプロイが発生しないため。** PR を出すようになった時点で、
 この判断は期限切れになる。
 

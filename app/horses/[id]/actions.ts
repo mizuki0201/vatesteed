@@ -15,6 +15,7 @@ export async function changeRetirement(formData: FormData): Promise<{ readonly o
   const result = await setHorseRetirement({
     horseId: formData.get("horseId"),
     target: formData.get("target"),
+    retiredOn: formData.get("retiredOn"),
   });
 
   if (result.ok) revalidatePath("/horses", "layout");

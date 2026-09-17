@@ -50,7 +50,7 @@ function toMemo(row: Record<string, unknown>): Memo {
 }
 
 /**
- * メモを1つ入れる。**画面から DB を書き換える経路の1つ**（もう1つは馬の引退の切り替え）。
+ * メモを1つ入れる。**画面から DB を書き換える経路の1つ**（もう1つは owner による事実データの書き換え）。
  *
  * Server Function は画面を通らない POST からも呼べるので、**認証はこの中で確かめる**
  * （node_modules/next/dist/docs の Mutating Data / Data Security）。読む側と同じく、

@@ -3,15 +3,17 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Card, Empty, PageShell, Section } from "@/components/screens/page-shell";
 import { NoteBody, PedigreeNoteBody } from "@/components/screens/note-body";
-import { HorseRetirementMenu } from "@/components/screens/horse-retirement-menu";
-import { can } from "@/lib/access";
-import { getViewer } from "@/lib/auth";
+import { EditMenu, type EditAction } from "@/components/screens/edit-menu";
+import { Input } from "@/components/ui/input";
 import {
   getHorse,
   listHorseEntries,
   nextRetirementTarget,
   RETIREMENT_TARGET_LABELS,
+  retiredOnLabel,
+  type HorseDetail,
 } from "@/lib/horses";
+import { changeRetirement } from "./actions";
 
 export const metadata: Metadata = { title: "馬 — Vatesteed" };
 
@@ -23,28 +25,15 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
 
   const entries = await listHorseEntries(id);
 
-  // 海外の馬は現役と引退に分けていないので出さない（docs/data-model.md#horses）
-  const canChangeRetirement = can(await getViewer(), "horses.retirement") && !horse.isOverseas;
-  const retirementTarget = nextRetirementTarget(horse.retiredAt);
-
   return (
     <PageShell
-      actions={
-        canChangeRetirement ? (
-          <HorseRetirementMenu
-            horseId={horse.id}
-            horseName={horse.name}
-            label={RETIREMENT_TARGET_LABELS[retirementTarget]}
-            target={retirementTarget}
-          />
-        ) : null
-      }
+      actions={<EditMenu actions={editActions(horse)} />}
       back={{ href: "/horses", label: "馬の一覧" }}
       lead={
         <>
           {horse.sex ?? ""}
           {horse.birthYear ? ` · ${horse.birthYear}年生` : ""}
-          {horse.retiredAt ? ` · 引退（${horse.retiredAt}）` : " · 現役扱い"}
+          {horse.retiredAt ? ` · 引退（${retiredOnLabel(horse.retiredAt)}）` : " · 現役扱い"}
           {horse.trainerId ? (
             <>
               {" · "}
@@ -145,4 +134,35 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
       </Section>
     </PageShell>
   );
+}
+
+/** この画面で owner が書き換えられるもの。 */
+function editActions(horse: HorseDetail): EditAction[] {
+  // 海外の馬は現役と引退に分けていないので出さない（docs/data-model.md#horses）
+  if (horse.isOverseas) return [];
+
+  const target = nextRetirementTarget(horse.retiredAt);
+  const label = RETIREMENT_TARGET_LABELS[target];
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
+
+  return [
+    {
+      id: "retirement",
+      label,
+      title: `${horse.name}を${label}しますか？`,
+      description:
+        target === "retired"
+          ? "馬の一覧では「引退」に出ます。引退日が分からなければ空のままにしてください（日付不明として記録します）。"
+          : "記録している引退日を消し、馬の一覧では「現役」に出ます。",
+      fields:
+        target === "retired" ? (
+          <label className="grid gap-1.5 text-sm">
+            <span>引退日（任意）</span>
+            <Input max={today} min="1900-01-01" name="retiredOn" type="date" />
+          </label>
+        ) : undefined,
+      hidden: { horseId: horse.id, target },
+      action: changeRetirement,
+    },
+  ];
 }

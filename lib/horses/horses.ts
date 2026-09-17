@@ -167,30 +167,27 @@ export async function getHorse(id: string): Promise<HorseDetail | undefined> {
  * Server Function は画面を通らない POST からも呼べるので、**認証はこの中で確かめる**
  * （`recordMemo` と同じ）。
  *
- * 引退にするときは、その日（日本時間）を引退日として入れる。**既に日付が入っていれば
- * 書き換えない**（二重に送られても、先に確認した日が残る）。現役に戻すときは null にする。
+ * 引退にするときは渡された引退日を入れる。空なら `1900-01-01`（日付不明）。現役に戻すときは
+ * null にする。
  *
  * **海外の馬は書き換えない。** 現役と引退に分けていないため（docs/data-model.md#horses）。
- * 当たる馬が無ければ `ok: false` を返す。
+ * 当たる馬が無いか、値が正しくなければ `ok: false` を返す。
  */
 export async function setHorseRetirement(input: {
   readonly horseId: unknown;
   readonly target: unknown;
+  readonly retiredOn?: unknown;
 }): Promise<{ readonly ok: boolean }> {
-  await assertCan("horses.retirement");
+  await assertCan("data.edit");
 
-  const parsed = parseRetirementInput(input.horseId, input.target);
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
+  const parsed = parseRetirementInput(input.horseId, input.target, input.retiredOn, today);
 
   if (!parsed.ok) return { ok: false };
 
   const { rowCount } = await query(
-    `UPDATE horses
-        SET retired_at = CASE
-              WHEN $2::boolean THEN COALESCE(retired_at, (now() AT TIME ZONE 'Asia/Tokyo')::date)
-              ELSE NULL
-            END
-      WHERE id = $1 AND is_overseas = false`,
-    [parsed.horseId, parsed.target === "retired"],
+    `UPDATE horses SET retired_at = $2::date WHERE id = $1 AND is_overseas = false`,
+    [parsed.horseId, parsed.retiredOn],
   );
 
   return { ok: (rowCount ?? 0) > 0 };

@@ -24,11 +24,11 @@ describe("can", () => {
     assert.equal(can("member", "notes.raw"), false);
   });
 
-  it("馬の現役と引退を切り替えられるのは owner だけ", () => {
-    assert.equal(can("owner", "horses.retirement"), true);
-    assert.equal(can("friend", "horses.retirement"), false);
-    assert.equal(can("member", "horses.retirement"), false);
-    assert.equal(can("public", "horses.retirement"), false);
+  it("事実データを書き換えられるのは owner だけ", () => {
+    assert.equal(can("owner", "data.edit"), true);
+    assert.equal(can("friend", "data.edit"), false);
+    assert.equal(can("member", "data.edit"), false);
+    assert.equal(can("public", "data.edit"), false);
   });
 
   it("public のものは誰でも見られる", () => {

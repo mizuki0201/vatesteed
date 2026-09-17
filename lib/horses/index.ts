@@ -23,6 +23,8 @@ export {
   nextRetirementTarget,
   parseRetirementInput,
   RETIREMENT_TARGET_LABELS,
+  retiredOnLabel,
+  UNKNOWN_RETIRED_ON,
   type RetirementInput,
   type RetirementTarget,
 } from "./retirement.ts";

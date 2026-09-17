@@ -19,7 +19,7 @@ export default async function Page({
 
   return (
     <PageShell
-      lead="AI の予想に基づく馬券成績です。1レースの予算は 2,000円で固定です。"
+      lead="AI の予想に基づく馬券成績です。"
       actions={<ResultsFilter action="/results/ai" period={period} />}
       title="AI の成績"
     >

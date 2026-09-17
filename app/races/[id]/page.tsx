@@ -117,7 +117,7 @@ export default async function Page({ params }: { readonly params: Promise<{ id: 
         )}
       </Section>
 
-      <Section note="実際には買わず、記録だけ残しています。1レース 2,000円" title="買い目">
+      <Section title="買い目">
         {bets.length === 0 ? (
           <Empty>まだ買い目を組んでいません。</Empty>
         ) : (

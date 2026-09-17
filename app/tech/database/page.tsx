@@ -231,7 +231,7 @@ const GROUPS: readonly Group[] = [
   },
   {
     heading: "購入",
-    what: "馬券は実際には買わず、記録だけ残して回収率を測る。買い目は「列」で持つ",
+    what: "AI の買い目を残して回収率を測る。買い目は「列」で持つ",
     tables: [
       {
         name: "ai_bets",

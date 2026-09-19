@@ -11,3 +11,12 @@ export {
   type EntryResult,
   type ExpandedBet,
 } from "./bets.ts";
+export {
+  allocateEvenPayout,
+  DEFAULT_BUDGET,
+  maxProfitableCount,
+  parseAllocateArgs,
+  payoutPerUnit,
+  type AllocateArgs,
+  type EvenPayoutAllocation,
+} from "./allocation.ts";

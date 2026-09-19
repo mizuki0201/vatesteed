@@ -24,6 +24,7 @@ import { leadingKeyword, stripSqlNoise } from "./sql-text.ts";
  */
 export const ANALYSIS_RESULT_TABLES: ReadonlySet<string> = new Set([
   "ai_bet_legs",
+  "ai_bet_rationales",
   "ai_bets",
   "ai_predictions",
   "course_notes",

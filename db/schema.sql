@@ -17,6 +17,7 @@
 --   0011_memos.sql
 --   0011_notes_no_internal_terms.sql
 --   0012_horses_is_overseas.sql
+--   0013_ai_bet_rationales.sql
 
 -- ---------------------------------------------------------------------------
 -- 関数
@@ -48,6 +49,18 @@ CREATE TABLE ai_bet_legs (
   CONSTRAINT ai_bet_legs_bracket_number_check CHECK (((bracket_number >= 1) AND (bracket_number <= 8))),
   CONSTRAINT ai_bet_legs_leg_group_check CHECK ((leg_group > 0)),
   CONSTRAINT ai_bet_legs_one_target CHECK ((num_nonnulls(entry_id, bracket_number) = 1))
+);
+
+CREATE TABLE ai_bet_rationales (
+  id              bigserial                NOT NULL,
+  race_id         bigint                   NOT NULL,
+  odds_checked_at timestamp with time zone NOT NULL,
+  body            text                     NOT NULL,
+  created_at      timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at      timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT ai_bet_rationales_pkey PRIMARY KEY (id),
+  CONSTRAINT ai_bet_rationales_race_id_key UNIQUE (race_id),
+  CONSTRAINT ai_bet_rationales_body_not_blank CHECK ((btrim(body) <> ''::text))
 );
 
 CREATE TABLE ai_bets (
@@ -488,6 +501,7 @@ CREATE TABLE users (
 
 ALTER TABLE ai_bet_legs ADD CONSTRAINT ai_bet_legs_ai_bet_id_fkey FOREIGN KEY (ai_bet_id) REFERENCES ai_bets(id) ON DELETE CASCADE;
 ALTER TABLE ai_bet_legs ADD CONSTRAINT ai_bet_legs_entry_id_fkey FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE RESTRICT;
+ALTER TABLE ai_bet_rationales ADD CONSTRAINT ai_bet_rationales_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE RESTRICT;
 ALTER TABLE ai_bets ADD CONSTRAINT ai_bets_race_id_fkey FOREIGN KEY (race_id) REFERENCES races(id) ON DELETE RESTRICT;
 ALTER TABLE ai_predictions ADD CONSTRAINT ai_predictions_entry_id_fkey FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE;
 ALTER TABLE ai_predictions ADD CONSTRAINT ai_predictions_mark_id_fkey FOREIGN KEY (mark_id) REFERENCES marks(id) ON DELETE RESTRICT;
@@ -543,6 +557,7 @@ CREATE INDEX trainers_name_idx ON public.trainers USING btree (name);
 -- トリガー
 -- ---------------------------------------------------------------------------
 
+CREATE TRIGGER ai_bet_rationales_set_updated_at BEFORE UPDATE ON public.ai_bet_rationales FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER ai_bets_set_updated_at BEFORE UPDATE ON public.ai_bets FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER ai_predictions_set_updated_at BEFORE UPDATE ON public.ai_predictions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER course_notes_set_updated_at BEFORE UPDATE ON public.course_notes FOR EACH ROW EXECUTE FUNCTION set_updated_at();

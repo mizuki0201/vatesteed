@@ -68,7 +68,7 @@
 | 要素 | 実体 | 役割 |
 | --- | --- | --- |
 | エージェント | `agent/` + `lib/` | 分析・予想・発信を実行する。実行に使うエージェントは運用ごとに選ぶ |
-| ナレッジDB | Neon (Postgres) 28テーブル | 評価と解釈の蓄積先。[data-model.md](data-model.md) |
+| ナレッジDB | Neon (Postgres) 29テーブル | 評価と解釈の蓄積先。[data-model.md](data-model.md) |
 | ダッシュボード | `app/` (Next.js) | 人間が見る画面。閲覧権限で出し分ける |
 | 発信チャネル | note / Zenn / X | 外向けの出力。[publishing.md](publishing.md) |
 | 設計ドキュメント | `docs/` | 上記すべての正本 |
@@ -186,16 +186,19 @@ Vatesteed の運用の中心は **「競馬について対話する」**（1）�
 | 人間 | 対象レースを選ぶ。取得内容を確認する。解釈を足す |
 | 情報を集める役 | 情報を集め、分析対象に直接属する事実だけをDBへ登録して読み直し、参照だけする関連情報・出典・不足を整理する |
 | 分析を担う役 | 登録済みの事実を使って各馬を評価し、展開と着順を予想し、買い目を組む |
-| 成果物 | `ai_predictions` `race_predictions` `race_prediction_conditions` `ai_bets` / note 記事 |
+| 成果物 | `ai_predictions` `race_predictions` `race_prediction_conditions` `ai_bets` `ai_bet_rationales` / note 記事 |
 | 関係するスキル | register-race → 各分析 → predict-race → plan-bets |
 
-**出した予想は、出した時点で固定する。** 枠順が確定する金曜か土曜に作り、日曜のレース前に出す。
-**当日の馬場を見てから公開済みの予想・買い目・記事を書き直さない。** 当日の話は運用1の対話として
-扱う（理由と、予想時点の前提をどこに置くかは
-[agent-design.md](agent-design.md#ラップと予想時点の前提2026-08-17-決定)）。
+**展開と印は、枠順が確定したあと、その時点の天気予報を前提に作って固定する。買い目は、
+レース当日の午前にその時点のオッズを見て組む**（2026-09-19 決定）。どちらも出したあとで
+書き直さない。**当日の馬場を見てから展開・印・買い目・記事を書き直さない。** 当日の話は運用1の
+対話として扱う（理由と、予想時点の前提をどこに置くかは
+[agent-design.md の いつ作るか](agent-design.md#いつ作るか2026-09-19-決定)と
+[ラップと予想時点の前提](agent-design.md#ラップと予想時点の前提2026-08-17-決定)）。
 
 馬券は実際に買わず、**購入ポートフォリオだけ出力して擬似的に購入**し回収率を計測する。
-**1レースあたりの予算は 2,000円で固定**し、レースの格や自信度で変えない（理由と手順は
+**1レースあたりの予算は 2,000円で固定**し、レースの格や自信度で変えない。**当たっても払戻が
+予算を上回らない組み合わせは買わず、人気より自分の評価が高い馬にお金を寄せる**（理由と手順は
 [agent-design.md](agent-design.md#5-買い目を組む)）。
 
 **各馬を読み終わるまで展開を組み始めない**、**展開は各時点の隊列まで出す**といった順序と
@@ -361,8 +364,9 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 
 ### 分析する役（`agent/subagents/`）
 
-**対象ごとに1つ。手順は各役の `instructions.md` が正本。** 分析する役の7つと検証する役は、
-**8つとも中身が書いてある**（2026-08-16）。**枠だけの役はもう無い。**
+**対象ごとに1つ。手順は各役の `instructions.md` が正本。** 分析する役の8つと検証する役は、
+**9つとも中身が書いてある**（2026-08-16。展開を組む `pace-analyst` は 2026-09-19 に足した）。
+**枠だけの役はもう無い。**
 
 **分析する役は、まず渡された調査資料と DB を読む**（2026-09-05 更新）。材料不足が判断に
 効くときは、対象、必要な事実、その事実を使う判断をCodexへ返す。CodexからClaude Codeへ渡す
@@ -416,6 +420,7 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 | course-analyst | コースの傾向 | `course_notes` |
 | entry-analyst | ある出走で何が起きたか | `entry_notes` |
 | race-analyst | レースのレベル・展開・馬場 | `race_notes` |
+| pace-analyst | 走る前のレースの展開（ペースと各時点の隊列） | `race_predictions`（書くのはオーケストレーター） |
 | verifier | 分析の結果を蓄積と突き合わせる | 書かない。指摘を返す |
 
 ### オーケストレーターのスキル（`agent/skills/`）
@@ -425,7 +430,7 @@ docs を直したとき、どの実装を直すべきかはこの表から辿る
 | register-race | 進行役 | — | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | review-race | 進行役 | — | [agent-design.md の振り返りの手順](agent-design.md#振り返りの手順2026-08-16-決定) |
 | predict-race | 予想 | `race_predictions` `race_prediction_conditions` `ai_predictions` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
-| plan-bets | 予想 | `ai_bets` `ai_bet_legs` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
+| plan-bets | 予想 | `ai_bets` `ai_bet_legs` `ai_bet_rationales` | [agent-design.md の予想の手順](agent-design.md#予想の手順2026-08-15-決定) |
 | intake-memos | 常に働く | `memos` ほか（宛先による） | [agent-design.md のメモの取り込み](agent-design.md#メモの取り込み2026-08-22-決定) |
 | improve-agent | 常に働く | `docs/` `agent/` | [agent-design.md の判断の誤りを直す](agent-design.md#8-判断の誤りを直す) |
 | write-note-article | 発信 | — | publishing.md |

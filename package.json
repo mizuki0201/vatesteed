@@ -15,6 +15,7 @@
     "gen:agents": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node lib/claude-agents/sync.ts",
     "claude:opus": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node scripts/claude-opus.ts",
     "horse:summary": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node scripts/horse-summary.ts",
+    "bets:allocate": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node scripts/bets-allocate.ts",
     "analysis:confirm": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node scripts/analysis-confirmation.ts",
     "db:query": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node --env-file-if-exists=.env.local lib/db/query.ts",
     "db:migrate": "PATH=\"$HOME/.local/share/mise/shims:$PATH\" node --env-file-if-exists=.env.local lib/db/migrate.ts",

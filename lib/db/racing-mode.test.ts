@@ -22,6 +22,8 @@ test("分析結果のテーブルへの更新は通す", () => {
     "UPDATE horse_notes SET body = $2 WHERE horse_id = $1",
     "DELETE FROM ai_bet_legs WHERE ai_bet_id = $1",
     "insert into pedigree_notes (horse_id, body, scope, author) values ($1, $2, $3, 'AI')",
+    // 買い目の理由は AI の判断なので、分析結果の側に入る
+    "INSERT INTO ai_bet_rationales (race_id, odds_checked_at, body) VALUES ($1, $2, $3) ON CONFLICT (race_id) DO UPDATE SET body = EXCLUDED.body",
   ]) {
     assert.doesNotThrow(() => assertRacingModeAllows(sqlText), sqlText);
   }
